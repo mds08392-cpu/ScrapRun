@@ -25,6 +25,41 @@ def start_moving(e):
     pass
 
 
+def start_running(e):
+    """e가 달리기 시작(Shift 누름) 이벤트인지 판별한다."""
+    pass
+
+
+def stop_running(e):
+    """e가 달리기 종료(Shift 뗌) 이벤트인지 판별한다."""
+    pass
+
+
+def jump_key(e):
+    """e가 스페이스바 입력인지 판별한다."""
+    pass
+
+
+def jump_end(e):
+    """e가 점프 종료('JUMP_END') 이벤트인지 판별한다."""
+    pass
+
+
+def dash_key(e):
+    """e가 대시 키 입력인지 판별한다."""
+    pass
+
+
+def dash_end(e):
+    """e가 대시 종료('DASH_END') 이벤트인지 판별한다."""
+    pass
+
+
+def player_dead(e):
+    """e가 사망('DEAD', HP 0) 이벤트인지 판별한다."""
+    pass
+
+
 def stop_moving(e):
     """e가 이동 정지('STOP_MOVE') 이벤트인지 판별한다."""
     pass
@@ -116,8 +151,8 @@ class Jump:
     def draw(p): pass
 
 
-class Attack:
-    """공격 상태 (미구현)."""
+class SpearAttack:
+    """창 근접 공격 (사용하지 않음, 껍데기만 유지)."""
 
     @staticmethod
     def enter(p, e): pass

@@ -1,9 +1,12 @@
 class StateMachine:
     """상태 전이 테이블에 따라 현재 상태를 관리하는 범용 상태 머신."""
-
+    # 총기사격 구현을 위해 사용
     def __init__(self, owner, start_state, transitions):
         """소유 객체, 시작 상태, 전이 테이블을 저장하고 시작 상태의 enter를 호출한다."""
-        pass
+        self.owner = owner
+        self.cur_state = start_state
+        self.transitions = transitions
+        self.cur_state.enter(owner, ('START', None))
 
     def update(self):
         """현재 상태의 do()를 호출한다."""

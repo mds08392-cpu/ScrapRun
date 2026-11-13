@@ -26,12 +26,12 @@ def start_moving(e):
 
 
 def start_running(e):
-    """e가 달리기 시작(Shift 누름) 이벤트인지 판별한다."""
+    """e가 달리기 시작(이동 중 Shift 누름, 또는 Shift 누른 채 이동 시작) 이벤트인지 판별한다."""
     pass
 
 
 def stop_running(e):
-    """e가 달리기 종료(Shift 뗌) 이벤트인지 판별한다."""
+    """e가 달리기 종료(Shift 뗌) 이벤트인지 판별한다. 이동 키를 모두 떼면 stop_moving으로 Idle 전환."""
     pass
 
 
@@ -46,7 +46,7 @@ def jump_end(e):
 
 
 def dash_key(e):
-    """e가 대시 키 입력인지 판별한다."""
+    """e가 대시 키(Ctrl) 입력인지 판별한다."""
     pass
 
 

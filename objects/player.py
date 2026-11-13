@@ -79,7 +79,7 @@ class Player:
         pass
 
     def can_act(self):
-        """Dash/Jump/Death 중이면 False (조준/사격/재장전 불가)."""
+        """Dash/Death 중이면 False (조준/사격/재장전 불가)."""
         pass
 
     def start_aim(self):

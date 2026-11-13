@@ -35,16 +35,6 @@ def stop_running(e):
     pass
 
 
-def jump_key(e):
-    """e가 스페이스바 입력인지 판별한다."""
-    pass
-
-
-def jump_end(e):
-    """e가 점프 종료('JUMP_END') 이벤트인지 판별한다."""
-    pass
-
-
 def dash_key(e):
     """e가 대시 키(Ctrl) 입력인지 판별한다."""
     pass
@@ -127,19 +117,6 @@ class Run:
 
 class Dash:
     """대시 상태 (미구현)."""
-
-    @staticmethod
-    def enter(p, e): pass
-    @staticmethod
-    def exit(p, e): pass
-    @staticmethod
-    def do(p): pass
-    @staticmethod
-    def draw(p): pass
-
-
-class Jump:
-    """점프 상태 - 스페이스바 입력 (미구현)."""
 
     @staticmethod
     def enter(p, e): pass

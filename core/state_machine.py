@@ -10,7 +10,7 @@ class StateMachine:
 
     def update(self):
         """현재 상태의 do()를 호출한다."""
-        pass
+        self.cur_state.do(self.owner)
 
     def handle_event(self, e):
         """전이 테이블에서 조건이 맞는 이벤트를 찾아 exit -> 상태 변경 -> enter 순으로 전이한다."""
@@ -18,4 +18,4 @@ class StateMachine:
 
     def draw(self):
         """현재 상태의 draw()를 호출한다."""
-        pass
+        self.cur_state.draw(self.owner)

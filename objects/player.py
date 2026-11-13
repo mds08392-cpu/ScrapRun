@@ -52,7 +52,47 @@ class Player:
 
     def __init__(self):
         """위치, 프레임, 키 입력, 바라보는 방향, 조준 정보, 이미지, 상태 머신을 초기화한다."""
-        pass
+        # 위치 / 애니메이션
+        self.x, self.y = WINDOW_W // 2, WINDOW_H // 2
+        self.frame = 0.0
+        self.dt = 0.0
+
+        # 이동 입력 (WASD)
+        self.keys = {k: False for k in MOVE_KEYS}
+        self.dir_x, self.dir_y = 0, 0
+        self.face_x = 'right'   # 마지막 좌우 입력
+        self.face_y = 'down'    # 마지막 상하 입력
+        self.last_vertical_only = True  # 마지막 이동이 상/하만이었는지 (멈췄을 때 방향 유지용)
+
+        # 조준 (우클릭 유지) / 마우스
+        self.aiming = False
+        self.mouse_x, self.mouse_y = self.x, self.y
+        self.aim_dir = 'down'
+
+        # 행동 (이동 상태와 별개): NONE / AIM / SHOOT / RELOAD
+        self.action = ACTION_NONE
+
+        # 전투 데이터
+        self.hp = self.max_hp = 100
+        self.ammo = self.max_ammo = 30
+        self.shoot_cooldown = 0.0   # 다음 발사까지 남은 시간
+        self.reload_timer = 0.0     # 재장전 남은 시간
+        self.recoil_acc = 0.0       # 연사로 누적된 반동
+
+        # 이미지 (구현이 진행되면 사격/재장전/달리기 시트를 여기에 추가)
+        self.images = {
+            'walk': load_image('resources/images/characters/Walk/Normal/walk.png'),
+            'walk_aim': load_image('resources/images/characters/Walk_while_Aiming - NEW/Walk_while_aiming.png'),
+        }
+
+        # 이동 상태 머신 (Dash/Death 진입 전이는 해당 상태 구현 시 추가)
+        self.state_machine = StateMachine(self, Idle, {
+            Idle: {start_moving: Walk},
+            Walk: {stop_moving: Idle, start_running: Run},
+            Run: {stop_running: Walk, stop_moving: Idle},
+            Dash: {},
+            Death: {},
+        })
 
     def facing_row(self):
         """현재 이동 입력과 마지막 방향을 바탕으로 일반 걷기 시트의 행 이름(6방향)을 반환한다."""

@@ -14,7 +14,12 @@ class StateMachine:
 
     def handle_event(self, e):
         """전이 테이블에서 조건이 맞는 이벤트를 찾아 exit -> 상태 변경 -> enter 순으로 전이한다."""
-        pass
+        for check, next_state in self.transitions.get(self.cur_state, {}).items():
+            if check(e):
+                self.cur_state.exit(self.owner, e)
+                self.cur_state = next_state
+                next_state.enter(self.owner, e)
+                return
 
     def draw(self):
         """현재 상태의 draw()를 호출한다."""

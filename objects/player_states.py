@@ -106,11 +106,9 @@ class Walk:
         nx = clamp(half_w, p.x + dx * speed * dt, p.bound_w - half_w)
         ny = clamp(half_h, p.y + dy * speed * dt, p.bound_h - half_h)
 
-        # x, y 축을 따로 이동해서 벽에 막힌 축만 멈춘다 (대각선이면 벽을 따라 미끄러짐)
-        if p.can_move_to(nx, p.y):
-            p.x = nx
-        if p.can_move_to(p.x, ny):
-            p.y = ny
+        # x, y 축을 따로 이동해서 벽에 막힌 축만 벽에 딱 붙여 멈춘다 (대각선이면 벽을 따라 미끄러짐)
+        p.move_x(nx)
+        p.move_y(ny)
 
         p.frame = (p.frame + WALK_FPS * dt) % FRAME_COUNT
 

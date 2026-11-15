@@ -123,6 +123,36 @@ class Player:
             return True
         return not self.tile_map.is_blocked_rect(*self.get_hitbox(x, y))
 
+    def move_x(self, nx):
+        """x를 nx로 옮긴다. 벽에 막히면 충돌 박스가 벽 경계에 딱 붙는 위치까지만 이동한다."""
+        if nx == self.x or self.can_move_to(nx, self.y):
+            self.x = nx
+            return
+        tw = self.tile_map.tile_w
+        if nx > self.x:   # 오른쪽: 새로 걸친 칸의 왼쪽 경계에 박스 오른쪽을 맞춤
+            edge = (nx + HIT_W / 2) // tw * tw
+            sx = edge - HIT_W / 2
+        else:             # 왼쪽: 새로 걸친 칸의 오른쪽 경계에 박스 왼쪽을 맞춤
+            edge = ((nx - HIT_W / 2) // tw + 1) * tw
+            sx = edge + HIT_W / 2
+        if min(self.x, nx) <= sx <= max(self.x, nx) and self.can_move_to(sx, self.y):
+            self.x = sx
+
+    def move_y(self, ny):
+        """y를 ny로 옮긴다. 벽에 막히면 충돌 박스가 벽 경계에 딱 붙는 위치까지만 이동한다."""
+        if ny == self.y or self.can_move_to(self.x, ny):
+            self.y = ny
+            return
+        th = self.tile_map.tile_h
+        if ny > self.y:   # 위쪽: 박스 윗변을 위 칸의 아래 경계에 맞춤
+            edge = (ny - HIT_FOOT_OFFSET + HIT_H) // th * th
+            sy = edge - HIT_H + HIT_FOOT_OFFSET
+        else:             # 아래쪽: 박스 아랫변을 아래 칸의 위 경계에 맞춤
+            edge = ((ny - HIT_FOOT_OFFSET) // th + 1) * th
+            sy = edge + HIT_FOOT_OFFSET
+        if min(self.y, ny) <= sy <= max(self.y, ny) and self.can_move_to(self.x, sy):
+            self.y = sy
+
     def draw_hitbox(self):
         """디버그용: 발밑 충돌 박스를 그린다."""
         l, b, r, t = self.get_hitbox()

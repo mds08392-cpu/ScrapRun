@@ -7,8 +7,7 @@ from objects.tile_map import TileMap
 
 WINDOW_W, WINDOW_H = 800, 600
 
-MAP_PATH = 'resources/images/maps/default_map.json'
-TILESET_PATH = 'resources/images/tilesets/apoc_tileset.png'
+MAP_PATH = 'resources/images/maps/default_map.json'   # 타일셋 정보는 맵 JSON 안에 포함되어 있음
 
 
 def main():
@@ -21,8 +20,9 @@ def main():
 
     world = World()
 
-    tile_map = TileMap(MAP_PATH, TILESET_PATH)
-    world.add_object(tile_map, World.LAYER_BG)
+    tile_map = TileMap(MAP_PATH)
+    world.add_object(tile_map, World.LAYER_BG)                    # 바닥
+    world.add_objects(tile_map.map_objects, World.LAYER_ITEM)     # 건물/소품 (y축 정렬)
     camera.set_world_size(tile_map.width, tile_map.height)
 
     player = Player()
@@ -30,7 +30,7 @@ def main():
     player.x, player.y = tile_map.width // 2, tile_map.height // 2  # 맵 중앙에서 시작
     world.add_object(player, World.LAYER_PLAYER)
 
-    show_collision = False  # F1: 벽 칸 / 충돌 박스 디버그 표시
+    show_collision = False  # F1: 벽 칸 / 덩어리 / 실내 영역 / 피벗 / 충돌 박스 디버그 표시
 
     running = True
     prev_time = get_time()
@@ -50,12 +50,13 @@ def main():
                 world.handle_event(event)
 
         world.update(dt)
+        tile_map.update_occlusion(player.x, player.sort_y)  # 건물 안이면 플레이어를 건물 위에 그림
         camera.follow(player.x, player.y)
 
         clear_canvas()
         world.draw()
         if show_collision:
-            tile_map.draw_collision()
+            tile_map.draw_debug()
             player.draw_hitbox()
         update_canvas()
         delay(0.01)

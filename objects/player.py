@@ -111,6 +111,11 @@ class Player:
         self.tile_map = tile_map
         self.set_bounds(tile_map.width, tile_map.height)
 
+    @property
+    def sort_y(self):
+        """y축 정렬 피벗 = 발바닥 y (충돌 박스 아랫변과 같다)."""
+        return self.y - HIT_FOOT_OFFSET
+
     def get_hitbox(self, x=None, y=None):
         """(x, y)에 서 있을 때의 발밑 충돌 박스 (left, bottom, right, top). 생략하면 현재 위치."""
         x = self.x if x is None else x

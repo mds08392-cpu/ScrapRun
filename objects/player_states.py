@@ -17,12 +17,12 @@ MOVE_KEYS = (SDLK_w, SDLK_a, SDLK_s, SDLK_d)
 # ---------------------------------------------------------------
 def move_key_event(e):
     """e가 WASD 키 입력(KEYDOWN/KEYUP) 이벤트인지 판별한다."""
-    pass
+    return e[0] == 'INPUT' and e[1].type in (SDL_KEYDOWN, SDL_KEYUP) and e[1].key in MOVE_KEYS
 
 
 def start_moving(e):
     """e가 이동 시작('START_MOVE') 이벤트인지 판별한다."""
-    pass
+    return e[0] == 'START_MOVE'
 
 
 def start_running(e):
@@ -52,7 +52,7 @@ def player_dead(e):
 
 def stop_moving(e):
     """e가 이동 정지('STOP_MOVE') 이벤트인지 판별한다."""
-    pass
+    return e[0] == 'STOP_MOVE'
 
 
 # ---------------------------------------------------------------
@@ -64,7 +64,7 @@ class Idle:
     @staticmethod
     def enter(p, e):
         """진입 시 프레임을 0으로 초기화한다."""
-        pass
+        p.frame = 0
 
     @staticmethod
     def exit(p, e):
@@ -77,7 +77,7 @@ class Idle:
     @staticmethod
     def draw(p):
         """걷기 시트의 첫 프레임으로 서있는 모습을 그린다."""
-        pass
+        p.draw_walk_frame(0)
 
 
 class Walk:
@@ -93,13 +93,27 @@ class Walk:
 
     @staticmethod
     def do(p):
-        """대각선 속도 보정, 조준 속도 배율 적용 이동, 화면 경계 클램프, 프레임 진행."""
-        pass
+        """대각선 속도 보정, 조준 속도 배율 적용 이동, 맵 경계 클램프, 프레임 진행."""
+        dt = p.dt
+        dx, dy = p.dir_x, p.dir_y
+        if dx and dy:  # 대각선 속도 보정
+            dx *= 0.7071
+            dy *= 0.7071
+        speed = WALK_SPEED * (AIM_SPEED_RATIO if p.aiming else 1.0)
+        p.x += dx * speed * dt
+        p.y += dy * speed * dt
+
+        # 맵(없으면 화면) 경계 밖으로 나가지 않도록 클램프
+        half_w, half_h = FRAME_W * SCALE // 2, FRAME_H * SCALE // 2
+        p.x = clamp(half_w, p.x, p.bound_w - half_w)
+        p.y = clamp(half_h, p.y, p.bound_h - half_h)
+
+        p.frame = (p.frame + WALK_FPS * dt) % FRAME_COUNT
 
     @staticmethod
     def draw(p):
         """현재 프레임을 그린다."""
-        pass
+        p.draw_walk_frame(int(p.frame))
 
 
 class Run:

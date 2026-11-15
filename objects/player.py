@@ -1,5 +1,6 @@
 from pico2d import *
 
+from core.camera import camera
 from core.state_machine import StateMachine
 from objects.player_states import *
 
@@ -54,6 +55,7 @@ class Player:
         """위치, 프레임, 키 입력, 바라보는 방향, 조준 정보, 이미지, 상태 머신을 초기화한다."""
         # 위치 / 애니메이션
         self.x, self.y = WINDOW_W // 2, WINDOW_H // 2
+        self.bound_w, self.bound_h = WINDOW_W, WINDOW_H  # 이동 가능 영역 (맵 크기로 set_bounds)
         self.frame = 0.0
         self.dt = 0.0
 
@@ -94,9 +96,20 @@ class Player:
             Death: {},
         })
 
+    def set_bounds(self, w, h):
+        """플레이어가 움직일 수 있는 영역(보통 맵 크기)을 지정한다."""
+        self.bound_w, self.bound_h = w, h
+
     def facing_row(self):
         """현재 이동 입력과 마지막 방향을 바탕으로 일반 걷기 시트의 행 이름(6방향)을 반환한다."""
-        pass
+        if self.dir_x == 0 and self.dir_y > 0:
+            return 'up'
+        if self.dir_x == 0 and self.dir_y < 0:
+            return 'down'
+        if self.dir_x == 0 and self.dir_y == 0 and self.last_vertical_only:
+            return self.face_y
+        # 좌/우가 들어간 경우 -> 바라보는 좌우 + 상/하 조합
+        return f'{self.face_x}_{self.face_y}'
 
     def update_aim_dir(self):
         """캐릭터에서 마우스까지의 각도를 계산해 8방향 중 하나를 aim_dir에 저장한다."""
@@ -108,15 +121,51 @@ class Player:
 
     def draw_walk_frame(self, frame):
         """조준 여부에 따라 알맞은 시트/행을 골라 걷기 프레임 한 장을 그린다."""
-        pass
+        if self.aiming:
+            image, row = self.images['walk_aim'], AIM_ROW[self.aim_dir]
+        else:
+            image, row = self.images['walk'], ROW[self.facing_row()]
+        image.clip_draw(frame * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
+                        self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
     def handle_mouse_event(self, event):
         """마우스 이동 좌표 갱신, 우클릭 누름/뗌에 따른 조준 시작/해제를 처리한다."""
         pass
 
     def handle_event(self, event):
-        """마우스/WASD 입력을 처리하고 이동 시작/정지 시 상태 머신에 이벤트를 전달한다."""
-        pass
+        """마우스/WASD 입력을 처리하고 이동 시작/정지 시 상태 머신에 이벤트를 전달한다.
+        (현재는 WASD 이동만 처리, 마우스 조준은 추후 구현)"""
+        e = ('INPUT', event)
+        if not move_key_event(e):
+            return
+
+        pressed = event.type == SDL_KEYDOWN
+        self.keys[event.key] = pressed
+
+        # 새로 누른 키로 바라보는 방향 갱신
+        if pressed:
+            if event.key == SDLK_a:
+                self.face_x = 'left'
+            elif event.key == SDLK_d:
+                self.face_x = 'right'
+            elif event.key == SDLK_w:
+                self.face_y = 'up'
+            elif event.key == SDLK_s:
+                self.face_y = 'down'
+
+        was_moving = self.dir_x != 0 or self.dir_y != 0
+        self.dir_x = self.keys[SDLK_d] - self.keys[SDLK_a]
+        self.dir_y = self.keys[SDLK_w] - self.keys[SDLK_s]
+        now_moving = self.dir_x != 0 or self.dir_y != 0
+
+        # 멈췄을 때 마지막으로 보던 방향 유지용 (상/하만 누르다 멈춘 경우)
+        if now_moving:
+            self.last_vertical_only = self.dir_x == 0
+
+        if now_moving and not was_moving:
+            self.state_machine.handle_event(('START_MOVE', None))
+        elif was_moving and not now_moving:
+            self.state_machine.handle_event(('STOP_MOVE', None))
 
     def can_act(self):
         """Dash/Death 중이면 False (조준/사격/재장전 불가)."""
@@ -164,8 +213,9 @@ class Player:
 
     def update(self, dt):
         """dt를 저장하고 상태 머신을 업데이트하며, 조준 중이면 조준 방향을 갱신한다."""
-        pass
+        self.dt = dt
+        self.state_machine.update()
 
     def draw(self):
         """상태 머신에 그리기를 위임한다."""
-        pass
+        self.state_machine.draw()

@@ -26,9 +26,11 @@ def main():
     camera.set_world_size(tile_map.width, tile_map.height)
 
     player = Player()
-    player.set_bounds(tile_map.width, tile_map.height)
+    player.set_map(tile_map)  # 벽 충돌 판정 + 이동 영역
     player.x, player.y = tile_map.width // 2, tile_map.height // 2  # 맵 중앙에서 시작
     world.add_object(player, World.LAYER_PLAYER)
+
+    show_collision = False  # F1: 벽 칸 / 충돌 박스 디버그 표시
 
     running = True
     prev_time = get_time()
@@ -42,6 +44,8 @@ def main():
                 running = False
             elif event.type == SDL_KEYDOWN and event.key == SDLK_ESCAPE:
                 running = False
+            elif event.type == SDL_KEYDOWN and event.key == SDLK_F1:
+                show_collision = not show_collision
             else:
                 world.handle_event(event)
 
@@ -50,6 +54,9 @@ def main():
 
         clear_canvas()
         world.draw()
+        if show_collision:
+            tile_map.draw_collision()
+            player.draw_hitbox()
         update_canvas()
         delay(0.01)
 

@@ -7,6 +7,7 @@ SCALE = 2
 
 WALK_SPEED = 200.0              # 픽셀/초
 WALK_FPS = 10.0                 # 애니메이션 초당 프레임
+IDLE_FPS = 8.0                  # Idle(숨쉬기) 애니메이션 초당 프레임
 AIM_SPEED_RATIO = 0.6           # 조준하며 걸을 때 속도 배율
 
 MOVE_KEYS = (SDLK_w, SDLK_a, SDLK_s, SDLK_d)
@@ -59,7 +60,7 @@ def stop_moving(e):
 # 상태들 (모두 enter / exit / do / draw 를 가진다)
 # ---------------------------------------------------------------
 class Idle:
-    """서있는 상태. (아직 Idle 시트 미구현 -> 걷기 첫 프레임 표시 예정)"""
+    """서있는 상태. 맨손 Idle 시트(6방향 x 8프레임)를 반복 재생한다."""
 
     @staticmethod
     def enter(p, e):
@@ -72,12 +73,13 @@ class Idle:
 
     @staticmethod
     def do(p):
-        pass
+        """Idle 애니메이션 프레임을 진행한다."""
+        p.frame = (p.frame + IDLE_FPS * p.dt) % FRAME_COUNT
 
     @staticmethod
     def draw(p):
-        """걷기 시트의 첫 프레임으로 서있는 모습을 그린다."""
-        p.draw_walk_frame(0)
+        """맨손 Idle 시트의 현재 프레임을 바라보는 방향으로 그린다."""
+        p.draw_idle_frame(int(p.frame))
 
 
 class Walk:

@@ -88,7 +88,8 @@ class Player:
 
         # 이미지 (구현이 진행되면 사격/재장전/달리기 시트를 여기에 추가)
         self.images = {
-            'walk': load_image('resources/images/characters/Walk/Normal/walk.png'),
+            'idle': load_image('resources/images/characters/Idle/Normal/idle.png'),
+            'walk':load_image('resources/images/characters/Walk/Normal/walk.png'),
             'walk_aim': load_image('resources/images/characters/Walk_while_Aiming - NEW/Walk_while_aiming.png'),
         }
 
@@ -185,6 +186,11 @@ class Player:
             image, row = self.images['walk'], ROW[self.facing_row()]
         image.clip_draw(frame * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
                         self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
+
+    def draw_idle_frame(self, frame):
+        """맨손 Idle 시트에서 바라보는 방향(6방향) 행의 프레임 한 장을 그린다."""
+        self.images['idle'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
+                                      self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
     def handle_mouse_event(self, event):
         """마우스 이동 좌표 갱신, 우클릭 누름/뗌에 따른 조준 시작/해제를 처리한다."""

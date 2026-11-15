@@ -9,6 +9,10 @@ WINDOW_W, WINDOW_H = 800, 600
 FRAME_W, FRAME_H = 48, 64       # 스프라이트 한 프레임 크기
 SCALE = 2                       # 화면에 그릴 배율
 
+# 벽 충돌 박스 (발밑만 사용, 탑다운이라 상체는 벽 앞을 가려도 됨)
+HIT_W, HIT_H = 24, 14           # 충돌 박스 크기 (화면 픽셀)
+HIT_FOOT_OFFSET = 26            # 캐릭터 중심(y)에서 발바닥까지 거리
+
 # 일반 걷기 시트의 행 번호 (아래에서부터 0) - 6방향
 ROW = {
     'right_down': 0,
@@ -56,6 +60,7 @@ class Player:
         # 위치 / 애니메이션
         self.x, self.y = WINDOW_W // 2, WINDOW_H // 2
         self.bound_w, self.bound_h = WINDOW_W, WINDOW_H  # 이동 가능 영역 (맵 크기로 set_bounds)
+        self.tile_map = None    # 벽 충돌 판정용 맵 (set_map으로 지정)
         self.frame = 0.0
         self.dt = 0.0
 
@@ -99,6 +104,29 @@ class Player:
     def set_bounds(self, w, h):
         """플레이어가 움직일 수 있는 영역(보통 맵 크기)을 지정한다."""
         self.bound_w, self.bound_h = w, h
+
+    def set_map(self, tile_map):
+        """벽 충돌에 쓸 맵을 지정하고 이동 영역도 맵 크기로 맞춘다."""
+        self.tile_map = tile_map
+        self.set_bounds(tile_map.width, tile_map.height)
+
+    def get_hitbox(self, x=None, y=None):
+        """(x, y)에 서 있을 때의 발밑 충돌 박스 (left, bottom, right, top). 생략하면 현재 위치."""
+        x = self.x if x is None else x
+        y = self.y if y is None else y
+        bottom = y - HIT_FOOT_OFFSET
+        return x - HIT_W / 2, bottom, x + HIT_W / 2, bottom + HIT_H
+
+    def can_move_to(self, x, y):
+        """(x, y)로 옮겼을 때 충돌 박스가 벽에 걸리지 않으면 True."""
+        if self.tile_map is None:
+            return True
+        return not self.tile_map.is_blocked_rect(*self.get_hitbox(x, y))
+
+    def draw_hitbox(self):
+        """디버그용: 발밑 충돌 박스를 그린다."""
+        l, b, r, t = self.get_hitbox()
+        draw_rectangle(l - camera.x, b - camera.y, r - camera.x, t - camera.y, 0, 255, 0)
 
     def facing_row(self):
         """현재 이동 입력과 마지막 방향을 바탕으로 일반 걷기 시트의 행 이름(6방향)을 반환한다."""

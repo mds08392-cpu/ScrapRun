@@ -100,13 +100,17 @@ class Walk:
             dx *= 0.7071
             dy *= 0.7071
         speed = WALK_SPEED * (AIM_SPEED_RATIO if p.aiming else 1.0)
-        p.x += dx * speed * dt
-        p.y += dy * speed * dt
 
-        # 맵(없으면 화면) 경계 밖으로 나가지 않도록 클램프
+        # 맵(없으면 화면) 경계 밖으로 스프라이트가 나가지 않도록 클램프한 목표 위치
         half_w, half_h = FRAME_W * SCALE // 2, FRAME_H * SCALE // 2
-        p.x = clamp(half_w, p.x, p.bound_w - half_w)
-        p.y = clamp(half_h, p.y, p.bound_h - half_h)
+        nx = clamp(half_w, p.x + dx * speed * dt, p.bound_w - half_w)
+        ny = clamp(half_h, p.y + dy * speed * dt, p.bound_h - half_h)
+
+        # x, y 축을 따로 이동해서 벽에 막힌 축만 멈춘다 (대각선이면 벽을 따라 미끄러짐)
+        if p.can_move_to(nx, p.y):
+            p.x = nx
+        if p.can_move_to(p.x, ny):
+            p.y = ny
 
         p.frame = (p.frame + WALK_FPS * dt) % FRAME_COUNT
 

@@ -2,6 +2,7 @@ from pico2d import *
 
 from core.camera import camera
 from core.world import World
+from objects.crosshair import Crosshair
 from objects.player import Player
 from objects.tile_map import TileMap
 
@@ -14,9 +15,7 @@ def main():
     """캔버스를 열고 메인 루프(이벤트 -> update -> draw)를 실행한다."""
     open_canvas(WINDOW_W, WINDOW_H)
 
-    # 마우스 커서를 화살표 대신 크로스헤어로 변경 (이 창 안에서만 적용)
-    crosshair = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_CROSSHAIR)
-    SDL_SetCursor(crosshair)
+    hide_cursor()   # 시스템 커서 대신 Crosshair를 직접 그린다
 
     world = World()
 
@@ -29,6 +28,8 @@ def main():
     player.set_map(tile_map)  # 벽 충돌 판정 + 이동 영역
     player.x, player.y = tile_map.width // 2, tile_map.height // 2  # 맵 중앙에서 시작
     world.add_object(player, World.LAYER_PLAYER)
+
+    crosshair = Crosshair(player)   # UI라서 World(y축 정렬)에 넣지 않고 맨 마지막에 직접 그린다
 
     show_collision = False  # F1: 벽 칸 / 덩어리 / 실내 영역 / 피벗 / 충돌 박스 디버그 표시
 
@@ -52,16 +53,17 @@ def main():
         world.update(dt)
         tile_map.update_occlusion(player.x, player.sort_y)  # 건물 안이면 플레이어를 건물 위에 그림
         camera.follow(player.x, player.y)
+        crosshair.update(dt)
 
         clear_canvas()
         world.draw()
         if show_collision:
             tile_map.draw_debug()
             player.draw_hitbox()
+        crosshair.draw()
         update_canvas()
         delay(0.01)
 
-    SDL_FreeCursor(crosshair)
     close_canvas()
 
 

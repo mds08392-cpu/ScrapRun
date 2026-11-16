@@ -3,6 +3,7 @@ from pico2d import *
 from core.camera import camera
 from core.world import World
 from objects.crosshair import Crosshair
+from objects.hud import AmmoHud
 from objects.player import Player
 from objects.tile_map import TileMap
 
@@ -65,6 +66,7 @@ def main():
     tile_map = load_map(world, player, MAPS[map_index][1])
 
     crosshair = Crosshair(player)   # UI라서 World(y축 정렬)에 넣지 않고 맨 마지막에 직접 그린다
+    ammo_hud = AmmoHud(player)      # 왼쪽 아래 탄약 표시 (UI)
 
     show_collision = False  # F1: 벽 칸 / 덩어리 / 실내 영역 / 피벗 / 파밍 지점 / 충돌 박스 디버그 표시
 
@@ -98,6 +100,7 @@ def main():
         if show_collision:
             tile_map.draw_debug()
             player.draw_hitbox()
+        ammo_hud.draw()
         crosshair.draw()
         update_canvas()
         delay(0.01)

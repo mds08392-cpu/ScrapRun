@@ -17,14 +17,20 @@ from core.camera import camera
 #   farming*     타일 레이어   파밍 지점 (상자 등). 1칸짜리 소품으로 y축 정렬해서 그리고, 칸 위치를
 #                               farming_spots에 모아 둔다 (근처에서 아이템 파밍, 추후 구현).
 #                               실내에 있어도 interiors 처리로 뒤로 밀리지 않는다 (플레이어와 정상 정렬)
+#   roof*        타일 레이어   지붕. 서로 붙어 있는 지붕 타일을 한 덩어리(RoofObject)로 묶어 건물 위에 그리고,
+#                               플레이어 발이 그 지붕과 겹치는 interiors 사각형 안에 들어오면 서서히 숨긴다
+#                               (roof, roof_2 ... 같은 칸에 겹치는 환풍기/구멍용)
 #   collision    타일 레이어   충돌 전용 (칠해진 칸 = 벽), 그리지 않음
 # ---------------------------------------------------------------
 GROUND_PREFIX = 'ground'
 OBJECTS_PREFIX = 'object'      # objects, objects_2, object2 ... 모두 허용
 FARMING_PREFIX = 'farming'     # farming, farming_point ...
+ROOF_PREFIX = 'roof'           # roof, roof_2 ...
 SORT_GROUP_LAYER = 'sort_groups'
 INTERIOR_LAYER = 'interiors'
 COLLISION_LAYER = 'collision'
+
+ROOF_FADE_TIME = 0.15          # 지붕이 사라지거나 다시 나타나는 데 걸리는 시간 (초)
 
 # Tiled 타일 ID의 상위 3비트는 뒤집기 플래그이므로 실제 ID만 남길 때 사용
 GID_MASK = 0x1FFFFFFF
@@ -97,6 +103,29 @@ class MapObject:
             self.tile_map.draw_tile(gid, col, row)
 
 
+class RoofObject(MapObject):
+    """roof 레이어 타일의 덩어리(지붕 하나). 플레이어가 그 건물 안에 있으면 서서히 사라진다."""
+
+    def __init__(self, tile_map, left, bottom, right, top):
+        super().__init__(tile_map, left, bottom, right, top, occludable=False)
+        self.hidden = False   # update_occlusion에서 정함 (True면 플레이어가 이 지붕 아래에 있음)
+        self.alpha = 1.0      # 현재 불투명도 (0이면 그리지 않음)
+
+    def update(self, dt):
+        step = dt / ROOF_FADE_TIME
+        self.alpha = max(0.0, self.alpha - step) if self.hidden else min(1.0, self.alpha + step)
+
+    def draw(self):
+        if self.alpha <= 0 or not self.is_visible():
+            return
+        if self.alpha < 1:
+            self.tile_map.set_tile_alpha(self.alpha)
+        for gid, col, row in self.tiles:
+            self.tile_map.draw_tile(gid, col, row)
+        if self.alpha < 1:
+            self.tile_map.set_tile_alpha(1.0)
+
+
 class FarmingSpot:
     """파밍 지점 한 칸 (farming 레이어). 아이템/파밍 상태는 추후 구현."""
 
@@ -136,6 +165,7 @@ class TileMap:
         self.interior_rects = []                           # interiors 사각형 (월드 좌표)
         self.farming_spots = []                            # 파밍 지점 FarmingSpot 목록
         farming_layers = []
+        roof_layers = []                                   # roof 타일 레이어 데이터
 
         for layer in data['layers']:
             name, kind = layer['name'], layer['type']
@@ -146,6 +176,8 @@ class TileMap:
                     continue
                 elif name.startswith(FARMING_PREFIX):
                     farming_layers.append(layer['data'])
+                elif name.startswith(ROOF_PREFIX):
+                    roof_layers.append(layer['data'])
                 elif name.startswith(OBJECTS_PREFIX):
                     object_layers.append(layer['data'])
                 elif name.startswith(GROUND_PREFIX):
@@ -160,6 +192,8 @@ class TileMap:
 
         self.map_objects = self.build_map_objects(object_layers)
         self.map_objects += self.build_farming_spots(farming_layers)
+        self.roofs = self.build_roofs(roof_layers)         # 지붕 덩어리 (RoofObject)
+        self.map_objects += self.roofs                     # 피벗이 같은 건물 덩어리보다 나중에 그려지도록 맨 뒤에 둔다
 
     # ---------------- 생성 ----------------
     def tiled_rect(self, obj):
@@ -207,6 +241,35 @@ class TileMap:
                 self.farming_spots.append(FarmingSpot(col, row, *self.cell_rect(col, row)))
         return objs
 
+    def build_roofs(self, roof_layers):
+        """roof 레이어 타일을 상하좌우로 이어진 덩어리마다 RoofObject 하나로 묶는다. 피벗 = 덩어리 밑변."""
+        cells = {}   # (col, row) -> 그 칸의 타일 gid 목록 (레이어 순서)
+        for data in roof_layers:
+            for i, gid in enumerate(data):
+                if gid:
+                    cells.setdefault((i % self.cols, i // self.cols), []).append(gid)
+        roofs, done = [], set()
+        for start in cells:
+            if start in done:
+                continue
+            done.add(start)
+            stack, part = [start], []
+            while stack:
+                col, row = stack.pop()
+                part.append((col, row))
+                for near in ((col + 1, row), (col - 1, row), (col, row + 1), (col, row - 1)):
+                    if near in cells and near not in done:
+                        done.add(near)
+                        stack.append(near)
+            cols, rows = [c for c, _ in part], [r for _, r in part]
+            left, bottom, _, _ = self.cell_rect(min(cols), max(rows))
+            _, _, right, top = self.cell_rect(max(cols), min(rows))
+            roof = RoofObject(self, left, bottom, right, top)
+            for col, row in sorted(part, key=lambda cr: (cr[1], cr[0])):
+                roof.tiles.extend((gid, col, row) for gid in cells[(col, row)])
+            roofs.append(roof)
+        return roofs
+
     def farming_spot_near(self, x, y, dist):
         """월드 좌표 (x, y)에서 dist 이내(칸 사각형까지의 거리)인 가장 가까운 파밍 지점. 없으면 None."""
         best, best_d = None, dist
@@ -232,6 +295,8 @@ class TileMap:
             tops = [r[3] for r in inside
                     if obj.occludable and r[1] < obj.base_sort_y < r[3] and obj.overlaps(*r)]
             obj.sort_y = max(tops) if tops else obj.base_sort_y
+        for roof in self.roofs:   # 플레이어가 서 있는 실내 영역과 겹치는 지붕은 숨긴다
+            roof.hidden = any(roof.overlaps(*r) for r in inside)
 
     # ---------------- 충돌 ----------------
     def is_blocked_cell(self, col, row):
@@ -254,6 +319,11 @@ class TileMap:
         return False
 
     # ---------------- 그리기 ----------------
+    def set_tile_alpha(self, alpha):
+        """이후에 그리는 타일의 불투명도(0~1)를 정한다. 다 그린 뒤에는 1로 되돌려야 한다."""
+        for ts in self.tilesets:
+            ts.image.opacify(alpha)
+
     def draw_tile(self, gid, col, row):
         """맵의 (col, row) 칸(row는 위에서부터 0)에 gid 타일을 그린다."""
         gid &= GID_MASK

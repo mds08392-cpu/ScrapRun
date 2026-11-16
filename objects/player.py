@@ -70,6 +70,7 @@ class Player:
         self.face_x = 'right'   # 마지막 좌우 입력
         self.face_y = 'down'    # 마지막 상하 입력
         self.last_vertical_only = True  # 마지막 이동이 상/하만이었는지 (멈췄을 때 방향 유지용)
+        self.run_held = False   # Shift 누르고 있는지 (달리기)
 
         # 조준 (우클릭 유지) / 마우스
         self.aiming = False
@@ -91,11 +92,12 @@ class Player:
             'idle': load_image('resources/images/characters/Idle/Normal/idle.png'),
             'walk':load_image('resources/images/characters/Walk/Normal/walk.png'),
             'walk_aim': load_image('resources/images/characters/Walk_while_Aiming - NEW/Walk_while_aiming.png'),
+            'run': load_image('resources/images/characters/Run/Normal/run.png'),
         }
 
         # 이동 상태 머신 (Dash/Death 진입 전이는 해당 상태 구현 시 추가)
         self.state_machine = StateMachine(self, Idle, {
-            Idle: {start_moving: Walk},
+            Idle: {start_moving: Walk, start_running: Run},
             Walk: {stop_moving: Idle, start_running: Run},
             Run: {stop_running: Walk, stop_moving: Idle},
             Dash: {},
@@ -192,6 +194,11 @@ class Player:
         image.clip_draw(frame * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
                         self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
+    def draw_run_frame(self, frame):
+        """맨손 달리기 시트에서 바라보는 방향(6방향) 행의 프레임 한 장을 그린다."""
+        self.images['run'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
+                                     self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
+
     def draw_idle_frame(self, frame):
         """맨손 Idle 시트에서 바라보는 방향(6방향) 행의 프레임 한 장을 그린다."""
         self.images['idle'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
@@ -202,8 +209,15 @@ class Player:
         pass
 
     def handle_event(self, event):
-        """마우스/WASD 입력을 처리하고 이동 시작/정지 시 상태 머신에 이벤트를 전달한다.
-        (현재는 WASD 이동만 처리, 마우스 조준은 추후 구현)"""
+        """마우스/WASD/Shift 입력을 처리하고 이동·달리기 시작/정지 시 상태 머신에 이벤트를 전달한다.
+        (현재는 WASD 이동 + Shift 달리기만 처리, 마우스 조준은 추후 구현)"""
+        # Shift: 이동 중일 때만 달리기 시작/종료 (Shift만 누르면 무반응)
+        if event.type in (SDL_KEYDOWN, SDL_KEYUP) and event.key in RUN_KEYS:
+            self.run_held = event.type == SDL_KEYDOWN
+            if self.dir_x != 0 or self.dir_y != 0:
+                self.state_machine.handle_event(('START_RUN' if self.run_held else 'STOP_RUN', None))
+            return
+
         e = ('INPUT', event)
         if not move_key_event(e):
             return
@@ -232,7 +246,8 @@ class Player:
             self.last_vertical_only = self.dir_x == 0
 
         if now_moving and not was_moving:
-            self.state_machine.handle_event(('START_MOVE', None))
+            # Shift를 누른 채 이동을 시작하면 바로 달리기
+            self.state_machine.handle_event(('START_RUN' if self.run_held else 'START_MOVE', None))
         elif was_moving and not now_moving:
             self.state_machine.handle_event(('STOP_MOVE', None))
 

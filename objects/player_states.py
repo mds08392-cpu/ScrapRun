@@ -9,8 +9,11 @@ WALK_SPEED = 200.0              # 픽셀/초
 WALK_FPS = 10.0                 # 애니메이션 초당 프레임
 IDLE_FPS = 8.0                  # Idle(숨쉬기) 애니메이션 초당 프레임
 AIM_SPEED_RATIO = 0.6           # 조준하며 걸을 때 속도 배율
+RUN_SPEED = 300.0               # 달리기 속도 (픽셀/초)
+RUN_FPS = 14.0                  # 달리기 애니메이션 초당 프레임
 
 MOVE_KEYS = (SDLK_w, SDLK_a, SDLK_s, SDLK_d)
+RUN_KEYS = (SDLK_LSHIFT, SDLK_RSHIFT)
 
 
 # ---------------------------------------------------------------
@@ -28,12 +31,12 @@ def start_moving(e):
 
 def start_running(e):
     """e가 달리기 시작(이동 중 Shift 누름, 또는 Shift 누른 채 이동 시작) 이벤트인지 판별한다."""
-    pass
+    return e[0] == 'START_RUN'
 
 
 def stop_running(e):
     """e가 달리기 종료(Shift 뗌) 이벤트인지 판별한다. 이동 키를 모두 떼면 stop_moving으로 Idle 전환."""
-    pass
+    return e[0] == 'STOP_RUN'
 
 
 def dash_key(e):
@@ -54,6 +57,26 @@ def player_dead(e):
 def stop_moving(e):
     """e가 이동 정지('STOP_MOVE') 이벤트인지 판별한다."""
     return e[0] == 'STOP_MOVE'
+
+
+# ---------------------------------------------------------------
+# 공용 이동 함수 (Walk / Run)
+# ---------------------------------------------------------------
+def move_player(p, speed):
+    """대각선 속도 보정 후 speed로 이동한다. 맵 경계 클램프, 벽에 막힌 축만 멈춘다."""
+    dx, dy = p.dir_x, p.dir_y
+    if dx and dy:  # 대각선 속도 보정
+        dx *= 0.7071
+        dy *= 0.7071
+
+    # 맵(없으면 화면) 경계 밖으로 스프라이트가 나가지 않도록 클램프한 목표 위치
+    half_w, half_h = FRAME_W * SCALE // 2, FRAME_H * SCALE // 2
+    nx = clamp(half_w, p.x + dx * speed * p.dt, p.bound_w - half_w)
+    ny = clamp(half_h, p.y + dy * speed * p.dt, p.bound_h - half_h)
+
+    # x, y 축을 따로 이동해서 벽에 막힌 축만 벽에 딱 붙여 멈춘다 (대각선이면 벽을 따라 미끄러짐)
+    p.move_x(nx)
+    p.move_y(ny)
 
 
 # ---------------------------------------------------------------
@@ -95,24 +118,9 @@ class Walk:
 
     @staticmethod
     def do(p):
-        """대각선 속도 보정, 조준 속도 배율 적용 이동, 맵 경계 클램프, 프레임 진행."""
-        dt = p.dt
-        dx, dy = p.dir_x, p.dir_y
-        if dx and dy:  # 대각선 속도 보정
-            dx *= 0.7071
-            dy *= 0.7071
-        speed = WALK_SPEED * (AIM_SPEED_RATIO if p.aiming else 1.0)
-
-        # 맵(없으면 화면) 경계 밖으로 스프라이트가 나가지 않도록 클램프한 목표 위치
-        half_w, half_h = FRAME_W * SCALE // 2, FRAME_H * SCALE // 2
-        nx = clamp(half_w, p.x + dx * speed * dt, p.bound_w - half_w)
-        ny = clamp(half_h, p.y + dy * speed * dt, p.bound_h - half_h)
-
-        # x, y 축을 따로 이동해서 벽에 막힌 축만 벽에 딱 붙여 멈춘다 (대각선이면 벽을 따라 미끄러짐)
-        p.move_x(nx)
-        p.move_y(ny)
-
-        p.frame = (p.frame + WALK_FPS * dt) % FRAME_COUNT
+        """조준 속도 배율을 적용해 이동하고 걷기 프레임을 진행한다."""
+        move_player(p, WALK_SPEED * (AIM_SPEED_RATIO if p.aiming else 1.0))
+        p.frame = (p.frame + WALK_FPS * p.dt) % FRAME_COUNT
 
     @staticmethod
     def draw(p):
@@ -121,16 +129,31 @@ class Walk:
 
 
 class Run:
-    """달리기 상태 (미구현)."""
+    """달리기 상태 (이동 중 Shift 유지). 조준 불가: 진입 시 AIM 해제."""
 
     @staticmethod
-    def enter(p, e): pass
+    def enter(p, e):
+        """Run 중에는 조준할 수 없으므로 조준을 해제한다."""
+        if p.aiming:
+            p.aiming = False
+            p.apply_aim_to_facing()
+        if p.action == 'AIM':
+            p.action = 'NONE'
+
     @staticmethod
-    def exit(p, e): pass
+    def exit(p, e):
+        pass
+
     @staticmethod
-    def do(p): pass
+    def do(p):
+        """달리기 속도로 이동하고 달리기 프레임을 진행한다."""
+        move_player(p, RUN_SPEED)
+        p.frame = (p.frame + RUN_FPS * p.dt) % FRAME_COUNT
+
     @staticmethod
-    def draw(p): pass
+    def draw(p):
+        """맨손 달리기 시트의 현재 프레임을 그린다."""
+        p.draw_run_frame(int(p.frame))
 
 
 class Dash:

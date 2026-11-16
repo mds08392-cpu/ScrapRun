@@ -17,7 +17,7 @@ DASH_COOLDOWN = 0.5             # 대시가 끝난 뒤 다시 대시할 수 있�
 
 MOVE_KEYS = (SDLK_w, SDLK_a, SDLK_s, SDLK_d)
 RUN_KEYS = (SDLK_LSHIFT, SDLK_RSHIFT)
-DASH_KEYS = (SDLK_LCTRL, SDLK_RCTRL)
+DASH_KEYS = (SDLK_SPACE,)
 
 # 6방향 행 이름 -> 대시 방향 벡터 (이동 입력 없이 대시할 때 바라보는 방향으로)
 FACING_VECTOR = {
@@ -51,7 +51,7 @@ def stop_running(e):
 
 
 def dash_key(e):
-    """e가 대시 키(Ctrl) 입력인지 판별한다."""
+    """e가 대시 키(Space) 입력인지 판별한다."""
     return e[0] == 'DASH'
 
 
@@ -180,7 +180,7 @@ class Run:
 
 
 class Dash:
-    """대시 상태 (Ctrl). 진입 순간의 방향으로 고정된 채 빠르게 이동하고, 8프레임이 끝나면 종료.
+    """대시 상태 (Space). 진입 순간의 방향으로 고정된 채 빠르게 이동하고, 8프레임이 끝나면 종료.
     대시 중에는 조준/사격/재장전 불가 (action 잠금), 이동/Shift 입력은 끝날 때만 반영."""
 
     @staticmethod

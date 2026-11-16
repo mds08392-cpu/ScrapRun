@@ -72,7 +72,7 @@ class Player:
         self.last_vertical_only = True  # 마지막 이동이 상/하만이었는지 (멈췄을 때 방향 유지용)
         self.run_held = False   # Shift 누르고 있는지 (달리기)
 
-        # 대시 (Ctrl)
+        # 대시 (Space)
         self.dash_cooldown = 0.0        # 다음 대시까지 남은 시간
         self.dash_dx, self.dash_dy = 0, 0
         self.dash_row = 'down'          # 대시 중 고정된 스프라이트 방향
@@ -229,7 +229,7 @@ class Player:
     def handle_event(self, event):
         """마우스/WASD/Shift 입력을 처리하고 이동·달리기 시작/정지 시 상태 머신에 이벤트를 전달한다.
         (현재는 WASD 이동 + Shift 달리기만 처리, 마우스 조준은 추후 구현)"""
-        # Ctrl: 대시 (쿨다운 중이면 무시, Dash/Death 상태에서는 전이 테이블에 없어 무시됨)
+        # Space: 대시 (쿨다운 중이면 무시, Dash/Death 상태에서는 전이 테이블에 없어 무시됨)
         if event.type == SDL_KEYDOWN and event.key in DASH_KEYS:
             if self.dash_cooldown <= 0:
                 self.state_machine.handle_event(('DASH', None))

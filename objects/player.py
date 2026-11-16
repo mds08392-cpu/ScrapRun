@@ -61,11 +61,11 @@ ACTION_NONE, ACTION_AIM, ACTION_SHOOT, ACTION_RELOAD = 'NONE', 'AIM', 'SHOOT', '
 # 사격 시점 상태별 기본 탄착 반지름(spread, px) / 한 발당 반지름 증가량(recoil, px)
 # 탄착 반지름 = min(spread + 누적 bloom(recoil_acc), SPREAD_MAX). 크로스헤어 눈금도 이 값으로 벌어진다
 FIRE_PROFILE = {
-    'idle_aim': {'spread': 4,  'recoil': 2.0},   # 서서 조준: 가장 정확
-    'walk_aim': {'spread': 7,  'recoil': 2.5},
-    'idle':     {'spread': 9,  'recoil': 3.5},   # 조준 없이 좌클릭
-    'walk':     {'spread': 13, 'recoil': 4.5},
-    'run':      {'spread': 20, 'recoil': 6.0},   # 가장 부정확
+    'idle_aim': {'spread': 6,  'recoil': 2.0},   # 서서 조준: 가장 정확
+    'walk_aim': {'spread': 9,  'recoil': 2.5},
+    'idle':     {'spread': 12,  'recoil': 3.5},   # 조준 없이 좌클릭
+    'walk':     {'spread': 16, 'recoil': 4.5},
+    'run':      {'spread': 24, 'recoil': 6.0},   # 가장 부정확
 }
 RECOIL_MAX = 34         # bloom(recoil_acc) 상한
 SPREAD_MAX = 48         # 탄착 반지름 상한

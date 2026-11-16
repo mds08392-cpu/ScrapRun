@@ -13,6 +13,7 @@ WINDOW_W, WINDOW_H = 800, 600
 MAPS = [
     ('farm', 'resources/images/maps/farm_maps.json'),
     ('default', 'resources/images/maps/default_map.json'),
+    ('farm_big', 'resources/images/maps/farm_big.json'),
 ]
 START_MAP = 0   # 시작 맵 (MAPS 인덱스)
 

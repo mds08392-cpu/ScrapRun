@@ -6,7 +6,7 @@ from pico2d import *
 from core.camera import camera
 from core.state_machine import StateMachine
 from core.world import World
-from objects.bullet import Bullet
+from objects.bullet import spawn_shot
 from objects.player_states import *
 
 WINDOW_W, WINDOW_H = 800, 600
@@ -462,7 +462,7 @@ class Player:
             d = math.hypot(tx - self.x, ty - self.y) or 1.0
             sx = self.x + (tx - self.x) / d * MUZZLE_DIST
             sy = self.y + (ty - self.y) / d * MUZZLE_DIST
-            self.world.add_object(Bullet(self.world, self.tile_map, sx, sy, tx, ty), World.LAYER_BULLET)
+            spawn_shot(self.world, self.tile_map, World.LAYER_BULLET, sx, sy, tx, ty)   # 총알 + 총구 화염
         self.recoil_acc = min(self.recoil_acc + prof['recoil'], RECOIL_MAX)
         self.shoot_cooldown = FIRE_INTERVAL
         self.since_shot = 0.0

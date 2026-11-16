@@ -1,3 +1,5 @@
+import math
+
 from pico2d import *
 
 from core.camera import camera
@@ -38,6 +40,13 @@ AIM_ROW = {
 # 각도 45도 단위 구간 -> 방향 (0도 = 오른쪽, 반시계 방향)
 AIM_DIRS = ['right', 'right_up', 'up', 'left_up', 'left', 'left_down', 'down', 'right_down']
 
+# 서서 조준할 때 쓰는 조준 걷기 시트의 프레임 (다리가 모인 자세, 정지 화면으로 표시)
+# 정지 조준 전용 시트가 없어서 Walk_while_aiming의 한 프레임을 빌려 쓴다
+IDLE_AIM_FRAME = 3
+
+# 각도 60도 단위 구간 -> 6방향 시트 행 이름 (Idle+AIM은 6방향 Idle_Gun 시트를 쓰므로)
+AIM_DIRS_6 = ['right_up', 'up', 'left_up', 'left_down', 'down', 'right_down']
+
 
 # 행동(action) 종류 - 이동 상태(StateMachine)와 별개로 Player가 가진다
 ACTION_NONE, ACTION_AIM, ACTION_SHOOT, ACTION_RELOAD = 'NONE', 'AIM', 'SHOOT', 'RELOAD'
@@ -77,10 +86,13 @@ class Player:
         self.dash_dx, self.dash_dy = 0, 0
         self.dash_row = 'down'          # 대시 중 고정된 스프라이트 방향
 
-        # 조준 (우클릭 유지) / 마우스
-        self.aiming = False
-        self.mouse_x, self.mouse_y = self.x, self.y
-        self.aim_dir = 'down'
+        # 조준 (우클릭 유지) / 마우스 (마우스 좌표는 화면 좌표, 왼쪽 아래 원점)
+        self.aiming = False         # 실제로 조준 중인지 (Run/Dash 중에는 False)
+        self.aim_held = False       # 우클릭을 누르고 있는지 (Run/Dash가 끝나면 조준 재개용)
+        self.mouse_x, self.mouse_y = WINDOW_W // 2, WINDOW_H // 2
+        self.aim_angle = -90.0      # 캐릭터 -> 마우스 각도 (도, 0 = 오른쪽, 반시계)
+        self.aim_dir = 'down'       # 8방향 (조준 걷기 시트용)
+        self.aim_dir6 = 'down'      # 6방향 (Idle_Gun 시트용)
 
         # 행동 (이동 상태와 별개): NONE / AIM / SHOOT / RELOAD
         self.action = ACTION_NONE
@@ -187,12 +199,23 @@ class Player:
         return f'{self.face_x}_{self.face_y}'
 
     def update_aim_dir(self):
-        """캐릭터에서 마우스까지의 각도를 계산해 8방향 중 하나를 aim_dir에 저장한다."""
-        pass
+        """캐릭터(화면 좌표)에서 마우스까지의 각도로 8방향 aim_dir, 6방향 aim_dir6을 갱신한다."""
+        dx = self.mouse_x - (self.x - camera.x)
+        dy = self.mouse_y - (self.y - camera.y)
+        self.aim_angle = math.degrees(math.atan2(dy, dx))
+        a = self.aim_angle % 360
+        self.aim_dir = AIM_DIRS[int((a + 22.5) // 45) % 8]
+        self.aim_dir6 = AIM_DIRS_6[int(a // 60) % 6]
 
     def apply_aim_to_facing(self):
         """조준 해제 시 조준하던 방향을 일반 걷기 방향(face_x, face_y)으로 이어받는다."""
-        pass
+        d = self.aim_dir6
+        if d in ('up', 'down'):
+            self.face_y = d
+            self.last_vertical_only = True
+        else:
+            self.face_x, self.face_y = d.split('_')
+            self.last_vertical_only = False
 
     def draw_walk_frame(self, frame):
         """조준 여부에 따라 알맞은 시트/행을 골라 걷기 프레임 한 장을 그린다."""
@@ -218,17 +241,34 @@ class Player:
         self.images['dash'].clip_draw(frame * FRAME_W, row, FRAME_W, FRAME_H, sx, sy, w, h)
 
     def draw_idle_frame(self, frame):
-        """맨손 Idle 시트에서 바라보는 방향(6방향) 행의 프레임 한 장을 그린다."""
-        self.images['idle'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
-                                      self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
+        """Idle 프레임 한 장을 그린다. 조준 중이면 조준 걷기 시트의 서 있는 자세 프레임을
+        마우스 방향(8방향)으로 고정해서, 아니면 맨손 Idle 시트를 바라보는 방향으로."""
+        if self.aiming:
+            image, row = self.images['walk_aim'], AIM_ROW[self.aim_dir]
+            frame = IDLE_AIM_FRAME
+        else:
+            image, row = self.images['idle'], ROW[self.facing_row()]
+        image.clip_draw(frame * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
+                        self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
     def handle_mouse_event(self, event):
         """마우스 이동 좌표 갱신, 우클릭 누름/뗌에 따른 조준 시작/해제를 처리한다."""
-        pass
+        if event.type in (SDL_MOUSEMOTION, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP):
+            self.mouse_x, self.mouse_y = event.x, WINDOW_H - 1 - event.y  # SDL은 위가 0이라 y 반전
+        if event.type in (SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP) and event.button == SDL_BUTTON_RIGHT:
+            self.aim_held = event.type == SDL_MOUSEBUTTONDOWN
+            if self.aim_held:
+                self.start_aim()
+            else:
+                self.stop_aim()
 
     def handle_event(self, event):
         """마우스/WASD/Shift 입력을 처리하고 이동·달리기 시작/정지 시 상태 머신에 이벤트를 전달한다.
-        (현재는 WASD 이동 + Shift 달리기만 처리, 마우스 조준은 추후 구현)"""
+        (사격은 추후 구현)"""
+        if event.type in (SDL_MOUSEMOTION, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP):
+            self.handle_mouse_event(event)
+            return
+
         # Space: 대시 (쿨다운 중이면 무시, Dash/Death 상태에서는 전이 테이블에 없어 무시됨)
         if event.type == SDL_KEYDOWN and event.key in DASH_KEYS:
             if self.dash_cooldown <= 0:
@@ -277,15 +317,26 @@ class Player:
 
     def can_act(self):
         """Dash/Death 중이면 False (조준/사격/재장전 불가)."""
-        pass
+        return self.state_machine.cur_state not in (Dash, Death)
 
     def start_aim(self):
-        """우클릭 누름: 가능한 상태(Idle/Walk)일 때만 action을 AIM으로. Run이면 무시."""
-        pass
+        """우클릭 누름: 가능한 상태(Idle/Walk)일 때만 조준 시작, action을 AIM으로. Run/Dash면 무시."""
+        if self.state_machine.cur_state not in (Idle, Walk) or self.aiming:
+            return
+        self.aiming = True
+        if self.action == ACTION_NONE:
+            self.action = ACTION_AIM
+        self.update_aim_dir()
 
     def stop_aim(self):
-        """우클릭 뗌: AIM 해제, apply_aim_to_facing 호출."""
-        pass
+        """조준 해제 (우클릭 뗌, Run/Dash 진입): 조준하던 방향을 바라보는 방향으로 이어받는다."""
+        if not self.aiming:
+            return
+        self.aiming = False
+        if self.action == ACTION_AIM:
+            self.action = ACTION_NONE
+        self.update_aim_dir()
+        self.apply_aim_to_facing()
 
     def start_shoot(self):
         """좌클릭: 쿨다운/탄약/can_act 확인 후 fire() 호출, action을 SHOOT로."""
@@ -325,6 +376,8 @@ class Player:
         if self.dash_cooldown > 0:
             self.dash_cooldown -= dt
         self.state_machine.update()
+        if self.aiming:
+            self.update_aim_dir()  # 카메라가 움직이면 마우스가 가만히 있어도 각도가 바뀜
 
     def draw(self):
         """상태 머신에 그리기를 위임한다."""

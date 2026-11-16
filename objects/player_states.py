@@ -110,8 +110,10 @@ class Idle:
 
     @staticmethod
     def enter(p, e):
-        """진입 시 프레임을 0으로 초기화한다."""
+        """진입 시 프레임을 0으로 초기화하고, 우클릭을 누르고 있었다면 조준을 다시 시작한다."""
         p.frame = 0
+        if p.aim_held:
+            p.start_aim()
 
     @staticmethod
     def exit(p, e):
@@ -124,7 +126,7 @@ class Idle:
 
     @staticmethod
     def draw(p):
-        """맨손 Idle 시트의 현재 프레임을 바라보는 방향으로 그린다."""
+        """Idle 시트의 현재 프레임을 그린다 (조준 중이면 총 든 Idle 시트를 마우스 방향으로)."""
         p.draw_idle_frame(int(p.frame))
 
 
@@ -133,7 +135,9 @@ class Walk:
 
     @staticmethod
     def enter(p, e):
-        pass
+        """Run/Dash에서 돌아왔을 때 우클릭을 누르고 있었다면 조준을 다시 시작한다."""
+        if p.aim_held:
+            p.start_aim()
 
     @staticmethod
     def exit(p, e):
@@ -156,12 +160,8 @@ class Run:
 
     @staticmethod
     def enter(p, e):
-        """Run 중에는 조준할 수 없으므로 조준을 해제한다."""
-        if p.aiming:
-            p.aiming = False
-            p.apply_aim_to_facing()
-        if p.action == 'AIM':
-            p.action = 'NONE'
+        """Run 중에는 조준할 수 없으므로 조준을 해제한다 (우클릭 유지 여부는 기억)."""
+        p.stop_aim()
 
     @staticmethod
     def exit(p, e):
@@ -187,9 +187,7 @@ class Dash:
     def enter(p, e):
         """대시 방향/스프라이트 방향을 고정하고 조준·행동을 해제한다."""
         p.frame = 0
-        if p.aiming:
-            p.aiming = False
-            p.apply_aim_to_facing()
+        p.stop_aim()
         p.action = 'NONE'
 
         p.dash_row = p.facing_row()

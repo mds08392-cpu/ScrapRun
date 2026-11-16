@@ -7,9 +7,9 @@ class World:
     pico2d는 y가 위로 증가하므로 sort_y가 큰(화면 위쪽, 더 먼) 것부터 그린다.
     """
 
-    LAYER_COUNT = 4
-    LAYER_BG, LAYER_ITEM, LAYER_MONSTER, LAYER_PLAYER = range(LAYER_COUNT)
-    SORTED_LAYERS = (LAYER_ITEM, LAYER_MONSTER, LAYER_PLAYER)  # y축 정렬해서 그릴 레이어
+    LAYER_COUNT = 5
+    LAYER_BG, LAYER_ITEM, LAYER_MONSTER, LAYER_PLAYER, LAYER_BULLET = range(LAYER_COUNT)
+    SORTED_LAYERS = (LAYER_ITEM, LAYER_MONSTER, LAYER_PLAYER, LAYER_BULLET)  # y축 정렬해서 그릴 레이어
 
     def __init__(self):
         self.layers = [[] for _ in range(self.LAYER_COUNT)]

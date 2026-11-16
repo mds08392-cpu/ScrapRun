@@ -5,6 +5,8 @@ from pico2d import *
 
 from core.camera import camera
 from core.state_machine import StateMachine
+from core.world import World
+from objects.bullet import Bullet
 from objects.player_states import *
 
 WINDOW_W, WINDOW_H = 800, 600
@@ -71,6 +73,21 @@ RECOVER_DELAY = 0.12    # 마지막 발사 후 이 시간(초)이 지나야 bloo
 RECOVER_RATE = 70.0     # bloom이 줄어드는 속도 (px/초)
 FIRE_INTERVAL = 0.11    # 연사 간격(초)
 MIN_AIM_DIST = 40       # 마우스가 캐릭터에 이보다 가까우면 이 거리로 밀어서 계산
+MUZZLE_DIST = 20        # 캐릭터 중심에서 이만큼 앞에서 총알이 나온다
+
+
+def pick_target_point(px, py, mx, my, aim_angle, radius, rand=random.random):
+    """캐릭터(px, py)가 마우스 월드 좌표(mx, my)를 향해 쏠 때, 마우스를 중심으로 한
+    반지름 radius 원 안에서 고르게 한 점을 뽑아 반환한다. (pico2d 없이 테스트 가능한 순수 함수)
+    마우스가 캐릭터에 MIN_AIM_DIST보다 가까우면 같은 방향으로 MIN_AIM_DIST만큼 밀어낸 점을 중심으로 쓴다."""
+    dx, dy = mx - px, my - py
+    d = math.hypot(dx, dy)
+    if d < MIN_AIM_DIST:
+        ang = math.atan2(dy, dx) if d > 0 else math.radians(aim_angle)
+        mx, my = px + math.cos(ang) * MIN_AIM_DIST, py + math.sin(ang) * MIN_AIM_DIST
+    r = radius * math.sqrt(rand())          # sqrt가 있어야 원 안에 고르게 퍼진다
+    t = 2.0 * math.pi * rand()
+    return mx + r * math.cos(t), my + r * math.sin(t)
 
 
 class Player:
@@ -82,6 +99,7 @@ class Player:
         self.x, self.y = WINDOW_W // 2, WINDOW_H // 2
         self.bound_w, self.bound_h = WINDOW_W, WINDOW_H  # 이동 가능 영역 (맵 크기로 set_bounds)
         self.tile_map = None    # 벽 충돌 판정용 맵 (set_map으로 지정)
+        self.world = None       # 총알을 넣을 World (set_world로 지정)
         self.frame = 0.0
         self.dt = 0.0
 
@@ -113,6 +131,7 @@ class Player:
         self.shoot_held = False     # 좌클릭을 누르고 있는지 (Dash가 끝나면 사격 재개용)
         self.shoot_timer = 0.0      # 최소 사격 표시 시간 남은 값
         self.shoot_frame = 0.0      # 서서 사격할 때 프레임
+        self.shot_queued = False    # 클릭 후 아직 한 발도 안 나갔으면 True (짧은 클릭도 한 발은 나가게)
 
         # 전투 데이터
         self.hp = self.max_hp = 100
@@ -154,6 +173,10 @@ class Player:
         """벽 충돌에 쓸 맵을 지정하고 이동 영역도 맵 크기로 맞춘다."""
         self.tile_map = tile_map
         self.set_bounds(tile_map.width, tile_map.height)
+
+    def set_world(self, world):
+        """총알을 생성해 넣을 World를 지정한다."""
+        self.world = world
 
     @property
     def sort_y(self):
@@ -377,13 +400,14 @@ class Player:
 
     def start_shoot(self):
         """좌클릭: Dash/Death/재장전 중이 아니면 action을 SHOOT로 바꿔 사격 애니메이션을 시작한다.
-        (추후: 쿨다운/탄약 확인 후 fire() 호출)"""
+        실제 발사는 update에서 쿨다운/탄약을 확인한 뒤 fire()로 한다."""
         if not self.can_act() or self.action == ACTION_RELOAD:
             return
         if self.action != ACTION_SHOOT:
             self.action = ACTION_SHOOT
             self.shoot_frame = 0.0
         self.shoot_timer = SHOOT_MIN_TIME
+        self.shot_queued = True
         self.update_aim_dir()
 
     def stop_shoot(self):
@@ -391,6 +415,7 @@ class Player:
         (추후: 반동 회복 시작)"""
         if self.action != ACTION_SHOOT:
             return
+        self.shot_queued = False
         if self.aiming:
             self.action = ACTION_AIM
         else:
@@ -419,9 +444,30 @@ class Player:
         base = FIRE_PROFILE[self.accuracy_state()]['spread']
         return min(base + self.recoil_acc, SPREAD_MAX)
 
+    def pick_target(self, radius):
+        """마우스 월드 좌표를 중심으로 한 반지름 radius 원 안의 한 점(총알 방향)을 고른다."""
+        return pick_target_point(self.x, self.y, self.mouse_x + camera.x, self.mouse_y + camera.y,
+                                 self.aim_angle, radius)
+
+    def can_fire(self):
+        """사격 중이고 (좌클릭 유지 또는 아직 한 발도 안 쏜 클릭), 쿨다운이 끝났고 탄약이 있으면 True."""
+        return (self.action == ACTION_SHOOT and (self.shoot_held or self.shot_queued)
+                and self.shoot_cooldown <= 0 and self.ammo > 0)
+
     def fire(self):
-        """마우스 방향 + 퍼짐/누적 반동으로 총알을 발사하고 반동을 누적한다."""
-        pass
+        """지금 반지름의 원 안으로 총알을 쏜 뒤 bloom을 늘린다. (쏘고 나서 벌려야 첫 발이 작은 원 안에 들어감)"""
+        prof = FIRE_PROFILE[self.accuracy_state()]
+        tx, ty = self.pick_target(self.spread_radius())
+        if self.world is not None:
+            d = math.hypot(tx - self.x, ty - self.y) or 1.0
+            sx = self.x + (tx - self.x) / d * MUZZLE_DIST
+            sy = self.y + (ty - self.y) / d * MUZZLE_DIST
+            self.world.add_object(Bullet(self.world, self.tile_map, sx, sy, tx, ty), World.LAYER_BULLET)
+        self.recoil_acc = min(self.recoil_acc + prof['recoil'], RECOIL_MAX)
+        self.shoot_cooldown = FIRE_INTERVAL
+        self.since_shot = 0.0
+        self.shot_queued = False
+        self.ammo -= 1
 
     def recover_recoil(self):
         """마지막 발사 후 RECOVER_DELAY가 지나면 누적 bloom을 RECOVER_RATE로 줄인다."""
@@ -442,6 +488,9 @@ class Player:
         self.shoot_cooldown = max(0.0, self.shoot_cooldown - dt)
         self.since_shot += dt
         self.recover_recoil()
+        if self.can_fire():
+            self.update_aim_dir()
+            self.fire()
 
         if self.action == ACTION_SHOOT:
             self.shoot_frame = (self.shoot_frame + SHOOT_FPS * dt) % FRAME_COUNT

@@ -26,6 +26,7 @@ def main():
 
     player = Player()
     player.set_map(tile_map)  # 벽 충돌 판정 + 이동 영역
+    player.set_world(world)   # 총알 생성용
     player.x, player.y = tile_map.width // 2, tile_map.height // 2  # 맵 중앙에서 시작
     world.add_object(player, World.LAYER_PLAYER)
 

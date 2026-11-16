@@ -1,4 +1,5 @@
 import math
+import random
 
 from pico2d import *
 
@@ -55,14 +56,21 @@ AIM_DIRS_6 = ['right_up', 'up', 'left_up', 'left_down', 'down', 'right_down']
 # 행동(action) 종류 - 이동 상태(StateMachine)와 별개로 Player가 가진다
 ACTION_NONE, ACTION_AIM, ACTION_SHOOT, ACTION_RELOAD = 'NONE', 'AIM', 'SHOOT', 'RELOAD'
 
-# 사격 시점 상태별 퍼짐(도)/반동 - 값은 구현 시 튜닝
+# 사격 시점 상태별 기본 탄착 반지름(spread, px) / 한 발당 반지름 증가량(recoil, px)
+# 탄착 반지름 = min(spread + 누적 bloom(recoil_acc), SPREAD_MAX). 크로스헤어 눈금도 이 값으로 벌어진다
 FIRE_PROFILE = {
-    'idle_aim':  {'spread': 0, 'recoil': 0},
-    'idle':      {'spread': 0, 'recoil': 0},
-    'walk_aim':  {'spread': 0, 'recoil': 0},
-    'walk':      {'spread': 0, 'recoil': 0},
-    'run':       {'spread': 0, 'recoil': 0},
+    'idle_aim': {'spread': 4,  'recoil': 2.0},   # 서서 조준: 가장 정확
+    'walk_aim': {'spread': 7,  'recoil': 2.5},
+    'idle':     {'spread': 9,  'recoil': 3.5},   # 조준 없이 좌클릭
+    'walk':     {'spread': 13, 'recoil': 4.5},
+    'run':      {'spread': 20, 'recoil': 6.0},   # 가장 부정확
 }
+RECOIL_MAX = 34         # bloom(recoil_acc) 상한
+SPREAD_MAX = 48         # 탄착 반지름 상한
+RECOVER_DELAY = 0.12    # 마지막 발사 후 이 시간(초)이 지나야 bloom이 줄어들기 시작
+RECOVER_RATE = 70.0     # bloom이 줄어드는 속도 (px/초)
+FIRE_INTERVAL = 0.11    # 연사 간격(초)
+MIN_AIM_DIST = 40       # 마우스가 캐릭터에 이보다 가까우면 이 거리로 밀어서 계산
 
 
 class Player:
@@ -111,7 +119,8 @@ class Player:
         self.ammo = self.max_ammo = 30
         self.shoot_cooldown = 0.0   # 다음 발사까지 남은 시간
         self.reload_timer = 0.0     # 재장전 남은 시간
-        self.recoil_acc = 0.0       # 연사로 누적된 반동
+        self.recoil_acc = 0.0       # 연사로 누적된 탄착 반지름 증가량 (bloom, px)
+        self.since_shot = RECOVER_DELAY   # 마지막 발사 후 지난 시간
 
         # 이미지 (구현이 진행되면 사격/재장전/달리기 시트를 여기에 추가)
         self.images = {
@@ -398,15 +407,26 @@ class Player:
 
     def accuracy_state(self):
         """사격 시점의 (이동 상태, AIM 여부)로 FIRE_PROFILE 키를 반환한다."""
-        pass
+        s = self.state_machine.cur_state
+        if s is Run:
+            return 'run'
+        if s is Walk:
+            return 'walk_aim' if self.aiming else 'walk'
+        return 'idle_aim' if self.aiming else 'idle'   # Idle (Dash/Death는 사격 불가라 여기 안 옴)
+
+    def spread_radius(self):
+        """지금 쏘면 총알이 향할 수 있는 원의 반지름(px) = 자세별 기본값 + 누적 bloom."""
+        base = FIRE_PROFILE[self.accuracy_state()]['spread']
+        return min(base + self.recoil_acc, SPREAD_MAX)
 
     def fire(self):
         """마우스 방향 + 퍼짐/누적 반동으로 총알을 발사하고 반동을 누적한다."""
         pass
 
     def recover_recoil(self):
-        """사격을 쉬는 동안 시간에 따라 누적 반동을 감소시킨다."""
-        pass
+        """마지막 발사 후 RECOVER_DELAY가 지나면 누적 bloom을 RECOVER_RATE로 줄인다."""
+        if self.since_shot >= RECOVER_DELAY:
+            self.recoil_acc = max(0.0, self.recoil_acc - RECOVER_RATE * self.dt)
 
     def current_sheet(self):
         """(이동 상태, action) 조합으로 이미지/행 테이블에서 시트와 방향 행을 고른다."""
@@ -418,6 +438,10 @@ class Player:
         if self.dash_cooldown > 0:
             self.dash_cooldown -= dt
         self.state_machine.update()
+
+        self.shoot_cooldown = max(0.0, self.shoot_cooldown - dt)
+        self.since_shot += dt
+        self.recover_recoil()
 
         if self.action == ACTION_SHOOT:
             self.shoot_frame = (self.shoot_frame + SHOOT_FPS * dt) % FRAME_COUNT

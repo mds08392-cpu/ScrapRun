@@ -30,8 +30,8 @@ class Crosshair:
         self.shown = float(RING_MIN)    # 화면에 보이는(눈금 계산용) 반지름
 
     def update(self, dt):
-        """플레이어의 실제 탄착 반지름을 부드럽게 따라간다. (확산 모델 구현 전이라 고정)"""
-        pass
+        """플레이어의 실제 탄착 반지름을 부드럽게 따라간다."""
+        self.shown = smooth_radius(self.shown, self.player.spread_radius(), dt)
 
     @staticmethod
     def draw_tick(l, b, r, t):

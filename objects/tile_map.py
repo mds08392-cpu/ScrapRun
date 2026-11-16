@@ -14,10 +14,14 @@ from core.camera import camera
 #                               (사각형 밖 objects 타일은 자기 칸 밑변이 피벗)
 #   interiors    오브젝트 레이어  플레이어 발이 이 사각형 안에 있으면 겹치는 덩어리(건물)를 실내에 있는
 #                               것들(플레이어, 나중의 파밍 아이템 등) 뒤로 보낸다 -> 건물 위에 그려짐
+#   farming*     타일 레이어   파밍 지점 (상자 등). 1칸짜리 소품으로 y축 정렬해서 그리고, 칸 위치를
+#                               farming_spots에 모아 둔다 (근처에서 아이템 파밍, 추후 구현).
+#                               실내에 있어도 interiors 처리로 뒤로 밀리지 않는다 (플레이어와 정상 정렬)
 #   collision    타일 레이어   충돌 전용 (칠해진 칸 = 벽), 그리지 않음
 # ---------------------------------------------------------------
 GROUND_PREFIX = 'ground'
-OBJECTS_PREFIX = 'objects'
+OBJECTS_PREFIX = 'object'      # objects, objects_2, object2 ... 모두 허용
+FARMING_PREFIX = 'farming'     # farming, farming_point ...
 SORT_GROUP_LAYER = 'sort_groups'
 INTERIOR_LAYER = 'interiors'
 COLLISION_LAYER = 'collision'
@@ -38,7 +42,10 @@ class Tileset:
             info = self.load_external(src)
 
         self.tile_w, self.tile_h = info['tilewidth'], info['tileheight']
-        self.image = load_image(os.path.normpath(os.path.join(base_dir, info['image'])))
+        path = os.path.normpath(os.path.join(base_dir, info['image']))
+        if not os.path.exists(path):   # Tiled 작업 폴더 기준 경로가 남아 있으면 같은 폴더에서 파일 이름으로 찾는다
+            path = os.path.join(base_dir, os.path.basename(info['image']))
+        self.image = load_image(path)
         self.cols = self.image.w // self.tile_w
         self.rows = self.image.h // self.tile_h
         self.count = self.cols * self.rows
@@ -65,8 +72,9 @@ class Tileset:
 class MapObject:
     """objects 레이어 타일의 덩어리(건물 하나 또는 1칸 소품). World 정렬 레이어에 넣어 y축 정렬된다."""
 
-    def __init__(self, tile_map, left, bottom, right, top):
+    def __init__(self, tile_map, left, bottom, right, top, occludable=True):
         self.tile_map = tile_map
+        self.occludable = occludable  # False면 실내(interiors)에서도 정렬 피벗을 올리지 않음 (파밍 상자 등)
         self.left, self.bottom, self.right, self.top = left, bottom, right, top
         self.x = (left + right) / 2
         self.base_sort_y = bottom     # 피벗 = 덩어리 밑변
@@ -87,6 +95,22 @@ class MapObject:
             return
         for gid, col, row in self.tiles:
             self.tile_map.draw_tile(gid, col, row)
+
+
+class FarmingSpot:
+    """파밍 지점 한 칸 (farming 레이어). 아이템/파밍 상태는 추후 구현."""
+
+    def __init__(self, col, row, left, bottom, right, top):
+        self.col, self.row = col, row
+        self.rect = (left, bottom, right, top)
+        self.x, self.y = (left + right) / 2, (bottom + top) / 2   # 칸 중심 (월드 좌표)
+
+    def distance_to(self, x, y):
+        """(x, y)에서 이 칸 사각형까지의 최단 거리 (안에 있으면 0)."""
+        l, b, r, t = self.rect
+        dx = max(l - x, 0, x - r)
+        dy = max(b - y, 0, y - t)
+        return (dx * dx + dy * dy) ** 0.5
 
 
 class TileMap:
@@ -110,6 +134,8 @@ class TileMap:
         self.blocked = [False] * (self.cols * self.rows)   # 인덱스 = row * cols + col (row는 위에서부터 0)
         self.group_rects = []                              # sort_groups 사각형 (월드 좌표)
         self.interior_rects = []                           # interiors 사각형 (월드 좌표)
+        self.farming_spots = []                            # 파밍 지점 FarmingSpot 목록
+        farming_layers = []
 
         for layer in data['layers']:
             name, kind = layer['name'], layer['type']
@@ -118,6 +144,8 @@ class TileMap:
                     self.blocked = [gid != 0 for gid in layer['data']]
                 elif not layer.get('visible', True):
                     continue
+                elif name.startswith(FARMING_PREFIX):
+                    farming_layers.append(layer['data'])
                 elif name.startswith(OBJECTS_PREFIX):
                     object_layers.append(layer['data'])
                 elif name.startswith(GROUND_PREFIX):
@@ -131,6 +159,7 @@ class TileMap:
                 self.interior_rects = [self.tiled_rect(o) for o in layer['objects']]
 
         self.map_objects = self.build_map_objects(object_layers)
+        self.map_objects += self.build_farming_spots(farming_layers)
 
     # ---------------- 생성 ----------------
     def tiled_rect(self, obj):
@@ -164,6 +193,29 @@ class TileMap:
                     group.tiles.append((gid, col, row))
         return [g for g in groups if g.tiles] + list(singles.values())
 
+    def build_farming_spots(self, farming_layers):
+        """farming 레이어의 칸마다 FarmingSpot을 만들고, 그리기용 1칸 MapObject(실내 피벗 고정)를 반환한다."""
+        objs = []
+        for data in farming_layers:
+            for i, gid in enumerate(data):
+                if not gid:
+                    continue
+                col, row = i % self.cols, i // self.cols
+                obj = MapObject(self, *self.cell_rect(col, row), occludable=False)
+                obj.tiles.append((gid, col, row))
+                objs.append(obj)
+                self.farming_spots.append(FarmingSpot(col, row, *self.cell_rect(col, row)))
+        return objs
+
+    def farming_spot_near(self, x, y, dist):
+        """월드 좌표 (x, y)에서 dist 이내(칸 사각형까지의 거리)인 가장 가까운 파밍 지점. 없으면 None."""
+        best, best_d = None, dist
+        for spot in self.farming_spots:
+            d = spot.distance_to(x, y)
+            if d <= best_d:
+                best, best_d = spot, d
+        return best
+
     # ---------------- 갱신 ----------------
     def update(self, dt):
         pass
@@ -178,7 +230,7 @@ class TileMap:
                   if r[0] <= foot_x < r[2] and r[1] <= foot_y < r[3]]
         for obj in self.map_objects:
             tops = [r[3] for r in inside
-                    if r[1] < obj.base_sort_y < r[3] and obj.overlaps(*r)]
+                    if obj.occludable and r[1] < obj.base_sort_y < r[3] and obj.overlaps(*r)]
             obj.sort_y = max(tops) if tops else obj.base_sort_y
 
     # ---------------- 충돌 ----------------
@@ -241,3 +293,6 @@ class TileMap:
         for obj in self.map_objects:
             y = obj.base_sort_y - camera.y
             draw_rectangle(obj.left - camera.x, y, obj.right - camera.x - 1, y + 1, 255, 255, 0)
+        for spot in self.farming_spots:
+            l, b, r, t = spot.rect
+            draw_rectangle(l - camera.x + 4, b - camera.y + 4, r - camera.x - 5, t - camera.y - 5, 255, 0, 255)

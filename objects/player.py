@@ -72,6 +72,11 @@ class Player:
         self.last_vertical_only = True  # 마지막 이동이 상/하만이었는지 (멈췄을 때 방향 유지용)
         self.run_held = False   # Shift 누르고 있는지 (달리기)
 
+        # 대시 (Ctrl)
+        self.dash_cooldown = 0.0        # 다음 대시까지 남은 시간
+        self.dash_dx, self.dash_dy = 0, 0
+        self.dash_row = 'down'          # 대시 중 고정된 스프라이트 방향
+
         # 조준 (우클릭 유지) / 마우스
         self.aiming = False
         self.mouse_x, self.mouse_y = self.x, self.y
@@ -93,14 +98,18 @@ class Player:
             'walk':load_image('resources/images/characters/Walk/Normal/walk.png'),
             'walk_aim': load_image('resources/images/characters/Walk_while_Aiming - NEW/Walk_while_aiming.png'),
             'run': load_image('resources/images/characters/Run/Normal/run.png'),
+            'dash': load_image('resources/images/characters/Dash/Normal/Dash.png'),
+            'dash_dust': load_image('resources/images/characters/Dash/Dust/Dash_Dust.png'),
+            'dash_shadow': load_image('resources/images/characters/Dash/Dash_Shadow.png'),
         }
 
-        # 이동 상태 머신 (Dash/Death 진입 전이는 해당 상태 구현 시 추가)
+        # 이동 상태 머신 (Death 진입 전이는 해당 상태 구현 시 추가)
+        # Dash 종료는 dash_end(Idle)가 모든 DASH_END에 맞으므로 반드시 마지막에 둔다
         self.state_machine = StateMachine(self, Idle, {
-            Idle: {start_moving: Walk, start_running: Run},
-            Walk: {stop_moving: Idle, start_running: Run},
-            Run: {stop_running: Walk, stop_moving: Idle},
-            Dash: {},
+            Idle: {start_moving: Walk, start_running: Run, dash_key: Dash},
+            Walk: {stop_moving: Idle, start_running: Run, dash_key: Dash},
+            Run: {stop_running: Walk, stop_moving: Idle, dash_key: Dash},
+            Dash: {dash_end_run: Run, dash_end_walk: Walk, dash_end: Idle},
             Death: {},
         })
 
@@ -199,6 +208,15 @@ class Player:
         self.images['run'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
                                      self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
+    def draw_dash_frame(self, frame):
+        """대시 고정 방향(6방향)으로 그림자, 먼지, 본체 프레임을 차례로 그린다."""
+        sx, sy = self.x - camera.x, self.y - camera.y
+        w, h = FRAME_W * SCALE, FRAME_H * SCALE
+        row = ROW[self.dash_row] * FRAME_H
+        self.images['dash_shadow'].clip_draw(frame * FRAME_W, 0, FRAME_W, FRAME_H, sx, sy, w, h)
+        self.images['dash_dust'].clip_draw(frame * FRAME_W, row, FRAME_W, FRAME_H, sx, sy, w, h)
+        self.images['dash'].clip_draw(frame * FRAME_W, row, FRAME_W, FRAME_H, sx, sy, w, h)
+
     def draw_idle_frame(self, frame):
         """맨손 Idle 시트에서 바라보는 방향(6방향) 행의 프레임 한 장을 그린다."""
         self.images['idle'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
@@ -211,6 +229,12 @@ class Player:
     def handle_event(self, event):
         """마우스/WASD/Shift 입력을 처리하고 이동·달리기 시작/정지 시 상태 머신에 이벤트를 전달한다.
         (현재는 WASD 이동 + Shift 달리기만 처리, 마우스 조준은 추후 구현)"""
+        # Ctrl: 대시 (쿨다운 중이면 무시, Dash/Death 상태에서는 전이 테이블에 없어 무시됨)
+        if event.type == SDL_KEYDOWN and event.key in DASH_KEYS:
+            if self.dash_cooldown <= 0:
+                self.state_machine.handle_event(('DASH', None))
+            return
+
         # Shift: 이동 중일 때만 달리기 시작/종료 (Shift만 누르면 무반응)
         if event.type in (SDL_KEYDOWN, SDL_KEYUP) and event.key in RUN_KEYS:
             self.run_held = event.type == SDL_KEYDOWN
@@ -298,6 +322,8 @@ class Player:
     def update(self, dt):
         """dt를 저장하고 상태 머신을 업데이트하며, 조준 중이면 조준 방향을 갱신한다."""
         self.dt = dt
+        if self.dash_cooldown > 0:
+            self.dash_cooldown -= dt
         self.state_machine.update()
 
     def draw(self):

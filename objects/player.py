@@ -51,6 +51,17 @@ IDLE_AIM_FRAME = 3
 SHOOT_FPS = 16.0        # 서서 사격할 때 애니메이션 초당 프레임 (걷기/달리기 사격은 이동 FPS를 따름)
 SHOOT_MIN_TIME = 0.25   # 좌클릭을 짧게 눌러도 사격 애니메이션을 최소한 이 시간(초)만큼 보여줌
 
+# 재장전 (R키 또는 탄창이 비면 자동). Idle/Walk에서만 가능, Run/Dash에 들어가면 취소
+RELOAD_TIME = 1.2       # 재장전 시간(초). 재장전 애니메이션 8프레임이 이 시간 동안 한 번 재생된다
+RELOAD_KEYS = (SDLK_r,)
+START_RESERVE_AMMO = 90 # 예비 탄약 시작값 (인벤토리 구현 전 임시값, 추후 인벤의 총알 수로 교체)
+
+# 이동 입력 (dir_x, dir_y) -> 8방향 이름 (걸으며 재장전 시트용)
+MOVE_DIR8 = {
+    (1, 0): 'right', (-1, 0): 'left', (0, 1): 'up', (0, -1): 'down',
+    (1, 1): 'right_up', (1, -1): 'right_down', (-1, 1): 'left_up', (-1, -1): 'left_down',
+}
+
 # 각도 60도 단위 구간 -> 6방향 시트 행 이름 (Idle+AIM은 6방향 Idle_Gun 시트를 쓰므로)
 AIM_DIRS_6 = ['right_up', 'up', 'left_up', 'left_down', 'down', 'right_down']
 
@@ -136,6 +147,7 @@ class Player:
         # 전투 데이터
         self.hp = self.max_hp = 100
         self.ammo = self.max_ammo = 30
+        self.reserve_ammo = START_RESERVE_AMMO   # 예비 탄약 (추후 인벤토리 총알로 교체)
         self.shoot_cooldown = 0.0   # 다음 발사까지 남은 시간
         self.reload_timer = 0.0     # 재장전 남은 시간
         self.recoil_acc = 0.0       # 연사로 누적된 탄착 반지름 증가량 (bloom, px)
@@ -149,6 +161,8 @@ class Player:
             'shoot': load_image('resources/images/characters/Attack/Gun/Shooting.png'),
             'walk_shoot': load_image('resources/images/characters/Walk_while_Shooting - NEW/Walk_while_Shooting.png'),
             'run_shoot': load_image('resources/images/characters/Run_while_shooting/Run_while_shooting.png'),
+            'reload': load_image('resources/images/characters/Reloading/Reloading.png'),                         # 6방향
+            'walk_reload': load_image('resources/images/characters/Walk_while_Reloading - NEW/Walk_while_reloading.png'),  # 8방향
             'run': load_image('resources/images/characters/Run/Normal/run.png'),
             'dash': load_image('resources/images/characters/Dash/Normal/Dash.png'),
             'dash_dust': load_image('resources/images/characters/Dash/Dust/Dash_Dust.png'),
@@ -261,9 +275,21 @@ class Player:
             self.face_x, self.face_y = d.split('_')
             self.last_vertical_only = False
 
+    def move_dir8(self):
+        """현재 이동 입력의 8방향 이름 (입력이 없으면 바라보는 방향)."""
+        return MOVE_DIR8.get((self.dir_x, self.dir_y), self.facing_row())
+
+    def reload_frame(self):
+        """재장전 진행도(0~1)에 맞는 재장전 애니메이션 프레임 번호."""
+        progress = 1.0 - self.reload_timer / RELOAD_TIME
+        return min(int(progress * FRAME_COUNT), FRAME_COUNT - 1)
+
     def draw_walk_frame(self, frame):
-        """사격/조준 여부에 따라 알맞은 시트/행을 골라 걷기 프레임 한 장을 그린다."""
-        if self.action == ACTION_SHOOT:
+        """사격/조준/재장전 여부에 따라 알맞은 시트/행을 골라 걷기 프레임 한 장을 그린다."""
+        if self.action == ACTION_RELOAD:   # 걸으며 재장전: 이동 방향(8방향), 프레임은 재장전 진행도
+            image, row = self.images['walk_reload'], AIM_ROW[self.move_dir8()]
+            frame = self.reload_frame()
+        elif self.action == ACTION_SHOOT:
             image, row = self.images['walk_shoot'], AIM_ROW[self.aim_dir]
         elif self.aiming:
             image, row = self.images['walk_aim'], AIM_ROW[self.aim_dir]
@@ -294,8 +320,12 @@ class Player:
     def draw_idle_frame(self, frame):
         """Idle 프레임 한 장을 그린다. 사격 중이면 서서 사격 시트를 마우스 방향(8방향)으로,
         조준 중이면 조준 걷기 시트의 서 있는 자세 프레임을 고정해서,
+        재장전 중이면 서서 재장전 시트를 바라보는 방향(6방향)으로,
         아니면 맨손 Idle 시트를 바라보는 방향으로."""
-        if self.action == ACTION_SHOOT:
+        if self.action == ACTION_RELOAD:
+            image, row = self.images['reload'], ROW[self.facing_row()]
+            frame = self.reload_frame()
+        elif self.action == ACTION_SHOOT:
             image, row = self.images['shoot'], AIM_ROW[self.aim_dir]
             frame = int(self.shoot_frame)
         elif self.aiming:
@@ -323,10 +353,14 @@ class Player:
             # 뗐을 때는 update에서 최소 표시 시간이 지나면 stop_shoot
 
     def handle_event(self, event):
-        """마우스/WASD/Shift/Space 입력을 처리하고 이동·달리기·대시 시 상태 머신에 이벤트를 전달한다.
-        (사격은 애니메이션만, 총알 발사는 추후 구현)"""
+        """마우스/WASD/Shift/Space/R 입력을 처리하고 이동·달리기·대시 시 상태 머신에 이벤트를 전달한다."""
         if event.type in (SDL_MOUSEMOTION, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP):
             self.handle_mouse_event(event)
+            return
+
+        # R: 재장전
+        if event.type == SDL_KEYDOWN and event.key in RELOAD_KEYS:
+            self.start_reload()
             return
 
         # Space: 대시 (쿨다운 중이면 무시, Dash/Death 상태에서는 전이 테이블에 없어 무시됨)
@@ -380,8 +414,10 @@ class Player:
         return self.state_machine.cur_state not in (Dash, Death)
 
     def start_aim(self):
-        """우클릭 누름: 가능한 상태(Idle/Walk)일 때만 조준 시작, action을 AIM으로. Run/Dash면 무시."""
-        if self.state_machine.cur_state not in (Idle, Walk) or self.aiming:
+        """우클릭 누름: 가능한 상태(Idle/Walk)일 때만 조준 시작, action을 AIM으로. Run/Dash/재장전 중이면 무시
+        (우클릭 유지 여부는 aim_held로 기억해 두었다가 재장전이 끝나면 다시 조준)."""
+        if (self.state_machine.cur_state not in (Idle, Walk) or self.aiming
+                or self.action == ACTION_RELOAD):
             return
         self.aiming = True
         if self.action == ACTION_NONE:
@@ -422,13 +458,37 @@ class Player:
             self.action = ACTION_NONE
             self.apply_aim_to_facing()
 
+    def can_reload(self):
+        """Idle/Walk 중이고, 재장전 중이 아니고, 탄창이 덜 찼고, 예비 탄약이 있으면 True."""
+        return (self.state_machine.cur_state in (Idle, Walk) and self.action != ACTION_RELOAD
+                and self.ammo < self.max_ammo and self.reserve_ammo > 0)
+
     def start_reload(self):
-        """R키 또는 탄약 0: 가능한 상태에서 action을 RELOAD로, 재장전 타이머 시작."""
-        pass
+        """R키 또는 탄약 0: 가능하면 조준/사격을 멈추고 action을 RELOAD로, 재장전 타이머 시작."""
+        if not self.can_reload():
+            return
+        self.stop_shoot()
+        self.stop_aim()          # 조준하던 방향을 바라보는 방향으로 이어받음 (aim_held는 유지)
+        self.action = ACTION_RELOAD
+        self.reload_timer = RELOAD_TIME
+
+    def cancel_reload(self):
+        """Run/Dash 진입 시 재장전 취소 (탄약 변화 없음)."""
+        if self.action == ACTION_RELOAD:
+            self.action = ACTION_NONE
+            self.reload_timer = 0.0
 
     def finish_reload(self):
-        """재장전 시간이 끝나면 ammo를 max_ammo로 채우고 action을 NONE으로."""
-        pass
+        """재장전 시간이 끝나면 예비 탄약에서 탄창을 채우고, 누르고 있던 조준/사격을 다시 시작한다."""
+        loaded = min(self.max_ammo - self.ammo, self.reserve_ammo)
+        self.ammo += loaded
+        self.reserve_ammo -= loaded
+        self.action = ACTION_NONE
+        self.reload_timer = 0.0
+        if self.aim_held:
+            self.start_aim()
+        if self.shoot_held:
+            self.start_shoot()
 
     def accuracy_state(self):
         """사격 시점의 (이동 상태, AIM 여부)로 FIRE_PROFILE 키를 반환한다."""
@@ -491,6 +551,13 @@ class Player:
         if self.can_fire():
             self.update_aim_dir()
             self.fire()
+
+        if self.action == ACTION_RELOAD:
+            self.reload_timer -= dt
+            if self.reload_timer <= 0:
+                self.finish_reload()
+        elif self.ammo == 0:
+            self.start_reload()     # 탄창이 비면 자동 재장전 (Run 중이면 Run이 끝난 뒤)
 
         if self.action == ACTION_SHOOT:
             self.shoot_frame = (self.shoot_frame + SHOOT_FPS * dt) % FRAME_COUNT

@@ -164,9 +164,10 @@ class Run:
 
     @staticmethod
     def enter(p, e):
-        """Run 중에는 조준할 수 없으므로 조준을 해제한다 (우클릭 유지 여부는 기억).
+        """Run 중에는 조준·재장전할 수 없으므로 조준을 해제하고 재장전을 취소한다 (우클릭 유지 여부는 기억).
         사격은 가능하므로 Dash 뒤에 좌클릭을 누르고 있었다면 다시 시작한다."""
         p.stop_aim()
+        p.cancel_reload()   # Run 중에는 재장전 불가
         if p.shoot_held:
             p.start_shoot()
 
@@ -195,6 +196,7 @@ class Dash:
         """대시 방향/스프라이트 방향을 고정하고 조준·행동을 해제한다."""
         p.frame = 0
         p.stop_aim()
+        p.cancel_reload()
         p.action = 'NONE'
 
         p.dash_row = p.facing_row()

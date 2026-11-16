@@ -20,4 +20,4 @@ class Camera:
 
 
 # 모든 오브젝트가 함께 쓰는 카메라 (main에서 맵 크기를 지정한다)
-camera = Camera(800, 600)
+camera = Camera(960, 720)

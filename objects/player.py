@@ -9,7 +9,7 @@ from core.world import World
 from objects.bullet import spawn_shot
 from objects.player_states import *
 
-WINDOW_W, WINDOW_H = 800, 600
+WINDOW_W, WINDOW_H = 960, 720
 
 FRAME_W, FRAME_H = 48, 64       # 스프라이트 한 프레임 크기
 SCALE = 2                       # 화면에 그릴 배율

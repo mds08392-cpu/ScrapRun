@@ -7,7 +7,7 @@ from objects.hud import AmmoHud
 from objects.player import Player
 from objects.tile_map import TileMap
 
-WINDOW_W, WINDOW_H = 800, 600
+WINDOW_W, WINDOW_H = 960, 720
 
 # 맵 목록 (F2로 순서대로 바꿔 가며 확인). 타일셋은 맵 JSON에 포함되어 있거나 tilesets/*.tsx를 참조한다
 MAPS = [
@@ -55,6 +55,9 @@ def find_spawn(tile_map, player):
 def main():
     """캔버스를 열고 메인 루프(이벤트 -> update -> draw)를 실행한다."""
     open_canvas(WINDOW_W, WINDOW_H)
+    # 텍스트 입력(IME) 끄기: 달리기(Shift) 중 Space를 누르면 Shift+Space로 한/영이 전환되어
+    # 한글 모드에서 WASD 키 입력을 IME가 가로채 캐릭터가 움직이지 않는 문제 방지
+    SDL_StopTextInput()
 
     hide_cursor()   # 시스템 커서 대신 Crosshair를 직접 그린다
 

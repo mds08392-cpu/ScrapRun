@@ -1,6 +1,6 @@
 from pico2d import *
 
-WINDOW_W, WINDOW_H = 800, 600
+WINDOW_W, WINDOW_H = 960, 720
 FRAME_W, FRAME_H = 48, 64
 FRAME_COUNT = 8                 # 한 방향당 프레임 수
 SCALE = 2

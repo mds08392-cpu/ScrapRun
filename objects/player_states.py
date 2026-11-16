@@ -114,6 +114,8 @@ class Idle:
         p.frame = 0
         if p.aim_held:
             p.start_aim()
+        if p.shoot_held:
+            p.start_shoot()
 
     @staticmethod
     def exit(p, e):
@@ -135,9 +137,11 @@ class Walk:
 
     @staticmethod
     def enter(p, e):
-        """Run/Dash에서 돌아왔을 때 우클릭을 누르고 있었다면 조준을 다시 시작한다."""
+        """Run/Dash에서 돌아왔을 때 우클릭/좌클릭을 누르고 있었다면 조준/사격을 다시 시작한다."""
         if p.aim_held:
             p.start_aim()
+        if p.shoot_held:
+            p.start_shoot()
 
     @staticmethod
     def exit(p, e):
@@ -160,8 +164,11 @@ class Run:
 
     @staticmethod
     def enter(p, e):
-        """Run 중에는 조준할 수 없으므로 조준을 해제한다 (우클릭 유지 여부는 기억)."""
+        """Run 중에는 조준할 수 없으므로 조준을 해제한다 (우클릭 유지 여부는 기억).
+        사격은 가능하므로 Dash 뒤에 좌클릭을 누르고 있었다면 다시 시작한다."""
         p.stop_aim()
+        if p.shoot_held:
+            p.start_shoot()
 
     @staticmethod
     def exit(p, e):

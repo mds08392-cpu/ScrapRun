@@ -44,6 +44,10 @@ AIM_DIRS = ['right', 'right_up', 'up', 'left_up', 'left', 'left_down', 'down', '
 # 정지 조준 전용 시트가 없어서 Walk_while_aiming의 한 프레임을 빌려 쓴다
 IDLE_AIM_FRAME = 3
 
+# 사격 애니메이션 (총알/반동 등 사격 시스템은 추후 구현, 지금은 애니메이션만)
+SHOOT_FPS = 16.0        # 서서 사격할 때 애니메이션 초당 프레임 (걷기/달리기 사격은 이동 FPS를 따름)
+SHOOT_MIN_TIME = 0.25   # 좌클릭을 짧게 눌러도 사격 애니메이션을 최소한 이 시간(초)만큼 보여줌
+
 # 각도 60도 단위 구간 -> 6방향 시트 행 이름 (Idle+AIM은 6방향 Idle_Gun 시트를 쓰므로)
 AIM_DIRS_6 = ['right_up', 'up', 'left_up', 'left_down', 'down', 'right_down']
 
@@ -97,6 +101,11 @@ class Player:
         # 행동 (이동 상태와 별개): NONE / AIM / SHOOT / RELOAD
         self.action = ACTION_NONE
 
+        # 사격 애니메이션 (좌클릭)
+        self.shoot_held = False     # 좌클릭을 누르고 있는지 (Dash가 끝나면 사격 재개용)
+        self.shoot_timer = 0.0      # 최소 사격 표시 시간 남은 값
+        self.shoot_frame = 0.0      # 서서 사격할 때 프레임
+
         # 전투 데이터
         self.hp = self.max_hp = 100
         self.ammo = self.max_ammo = 30
@@ -109,6 +118,9 @@ class Player:
             'idle': load_image('resources/images/characters/Idle/Normal/idle.png'),
             'walk':load_image('resources/images/characters/Walk/Normal/walk.png'),
             'walk_aim': load_image('resources/images/characters/Walk_while_Aiming - NEW/Walk_while_aiming.png'),
+            'shoot': load_image('resources/images/characters/Attack/Gun/Shooting.png'),
+            'walk_shoot': load_image('resources/images/characters/Walk_while_Shooting - NEW/Walk_while_Shooting.png'),
+            'run_shoot': load_image('resources/images/characters/Run_while_shooting/Run_while_shooting.png'),
             'run': load_image('resources/images/characters/Run/Normal/run.png'),
             'dash': load_image('resources/images/characters/Dash/Normal/Dash.png'),
             'dash_dust': load_image('resources/images/characters/Dash/Dust/Dash_Dust.png'),
@@ -218,8 +230,10 @@ class Player:
             self.last_vertical_only = False
 
     def draw_walk_frame(self, frame):
-        """조준 여부에 따라 알맞은 시트/행을 골라 걷기 프레임 한 장을 그린다."""
-        if self.aiming:
+        """사격/조준 여부에 따라 알맞은 시트/행을 골라 걷기 프레임 한 장을 그린다."""
+        if self.action == ACTION_SHOOT:
+            image, row = self.images['walk_shoot'], AIM_ROW[self.aim_dir]
+        elif self.aiming:
             image, row = self.images['walk_aim'], AIM_ROW[self.aim_dir]
         else:
             image, row = self.images['walk'], ROW[self.facing_row()]
@@ -227,9 +241,14 @@ class Player:
                         self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
     def draw_run_frame(self, frame):
-        """맨손 달리기 시트에서 바라보는 방향(6방향) 행의 프레임 한 장을 그린다."""
-        self.images['run'].clip_draw(frame * FRAME_W, ROW[self.facing_row()] * FRAME_H, FRAME_W, FRAME_H,
-                                     self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
+        """달리기 프레임 한 장을 그린다. 사격 중이면 달리며 사격 시트를 마우스 방향(8방향)으로,
+        아니면 맨손 달리기 시트를 바라보는 방향(6방향)으로."""
+        if self.action == ACTION_SHOOT:
+            image, row = self.images['run_shoot'], AIM_ROW[self.aim_dir]
+        else:
+            image, row = self.images['run'], ROW[self.facing_row()]
+        image.clip_draw(frame * FRAME_W, row * FRAME_H, FRAME_W, FRAME_H,
+                        self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
     def draw_dash_frame(self, frame):
         """대시 고정 방향(6방향)으로 그림자, 먼지, 본체 프레임을 차례로 그린다."""
@@ -241,9 +260,13 @@ class Player:
         self.images['dash'].clip_draw(frame * FRAME_W, row, FRAME_W, FRAME_H, sx, sy, w, h)
 
     def draw_idle_frame(self, frame):
-        """Idle 프레임 한 장을 그린다. 조준 중이면 조준 걷기 시트의 서 있는 자세 프레임을
-        마우스 방향(8방향)으로 고정해서, 아니면 맨손 Idle 시트를 바라보는 방향으로."""
-        if self.aiming:
+        """Idle 프레임 한 장을 그린다. 사격 중이면 서서 사격 시트를 마우스 방향(8방향)으로,
+        조준 중이면 조준 걷기 시트의 서 있는 자세 프레임을 고정해서,
+        아니면 맨손 Idle 시트를 바라보는 방향으로."""
+        if self.action == ACTION_SHOOT:
+            image, row = self.images['shoot'], AIM_ROW[self.aim_dir]
+            frame = int(self.shoot_frame)
+        elif self.aiming:
             image, row = self.images['walk_aim'], AIM_ROW[self.aim_dir]
             frame = IDLE_AIM_FRAME
         else:
@@ -252,7 +275,7 @@ class Player:
                         self.x - camera.x, self.y - camera.y, FRAME_W * SCALE, FRAME_H * SCALE)
 
     def handle_mouse_event(self, event):
-        """마우스 이동 좌표 갱신, 우클릭 누름/뗌에 따른 조준 시작/해제를 처리한다."""
+        """마우스 이동 좌표 갱신, 우클릭 누름/뗌에 따른 조준 시작/해제, 좌클릭 사격을 처리한다."""
         if event.type in (SDL_MOUSEMOTION, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP):
             self.mouse_x, self.mouse_y = event.x, WINDOW_H - 1 - event.y  # SDL은 위가 0이라 y 반전
         if event.type in (SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP) and event.button == SDL_BUTTON_RIGHT:
@@ -261,10 +284,15 @@ class Player:
                 self.start_aim()
             else:
                 self.stop_aim()
+        if event.type in (SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP) and event.button == SDL_BUTTON_LEFT:
+            self.shoot_held = event.type == SDL_MOUSEBUTTONDOWN
+            if self.shoot_held:
+                self.start_shoot()
+            # 뗐을 때는 update에서 최소 표시 시간이 지나면 stop_shoot
 
     def handle_event(self, event):
-        """마우스/WASD/Shift 입력을 처리하고 이동·달리기 시작/정지 시 상태 머신에 이벤트를 전달한다.
-        (사격은 추후 구현)"""
+        """마우스/WASD/Shift/Space 입력을 처리하고 이동·달리기·대시 시 상태 머신에 이벤트를 전달한다.
+        (사격은 애니메이션만, 총알 발사는 추후 구현)"""
         if event.type in (SDL_MOUSEMOTION, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP):
             self.handle_mouse_event(event)
             return
@@ -339,12 +367,26 @@ class Player:
         self.apply_aim_to_facing()
 
     def start_shoot(self):
-        """좌클릭: 쿨다운/탄약/can_act 확인 후 fire() 호출, action을 SHOOT로."""
-        pass
+        """좌클릭: Dash/Death/재장전 중이 아니면 action을 SHOOT로 바꿔 사격 애니메이션을 시작한다.
+        (추후: 쿨다운/탄약 확인 후 fire() 호출)"""
+        if not self.can_act() or self.action == ACTION_RELOAD:
+            return
+        if self.action != ACTION_SHOOT:
+            self.action = ACTION_SHOOT
+            self.shoot_frame = 0.0
+        self.shoot_timer = SHOOT_MIN_TIME
+        self.update_aim_dir()
 
     def stop_shoot(self):
-        """좌클릭 뗌: SHOOT 종료, 반동 회복 시작."""
-        pass
+        """사격 종료: 조준 중이면 AIM으로, 아니면 NONE으로 돌아가고 사격하던 방향을 바라본다.
+        (추후: 반동 회복 시작)"""
+        if self.action != ACTION_SHOOT:
+            return
+        if self.aiming:
+            self.action = ACTION_AIM
+        else:
+            self.action = ACTION_NONE
+            self.apply_aim_to_facing()
 
     def start_reload(self):
         """R키 또는 탄약 0: 가능한 상태에서 action을 RELOAD로, 재장전 타이머 시작."""
@@ -376,7 +418,14 @@ class Player:
         if self.dash_cooldown > 0:
             self.dash_cooldown -= dt
         self.state_machine.update()
-        if self.aiming:
+
+        if self.action == ACTION_SHOOT:
+            self.shoot_frame = (self.shoot_frame + SHOOT_FPS * dt) % FRAME_COUNT
+            self.shoot_timer -= dt
+            if not self.shoot_held and self.shoot_timer <= 0:
+                self.stop_shoot()
+
+        if self.aiming or self.action == ACTION_SHOOT:
             self.update_aim_dir()  # 카메라가 움직이면 마우스가 가만히 있어도 각도가 바뀜
 
     def draw(self):

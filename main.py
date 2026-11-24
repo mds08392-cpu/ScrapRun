@@ -3,7 +3,7 @@ from pico2d import *
 from core.camera import camera
 from core.world import World
 from objects.crosshair import Crosshair
-from objects.hud import AmmoHud
+from objects.hud import AmmoHud, GunPartsHud
 from objects.laser import LaserSight
 from objects.player import Player
 from objects.tile_map import TileMap
@@ -73,6 +73,7 @@ def main():
 
     crosshair = Crosshair(player)   # UI라서 World(y축 정렬)에 넣지 않고 맨 마지막에 직접 그린다
     ammo_hud = AmmoHud(player)      # 왼쪽 아래 탄약 표시 (UI)
+    parts_hud = GunPartsHud(player, WINDOW_W, WINDOW_H)   # 오른쪽 아래 총기 파츠/능력치 (F3 켜기/끄기)
     laser = LaserSight(player)      # 레이저 도트 파츠를 달았을 때만 보임 (y축 정렬 없이 월드 위에)
 
     show_collision = False  # F1: 벽 칸 / 덩어리 / 실내 영역 / 피벗 / 파밍 지점 / 충돌 박스 디버그 표시
@@ -91,6 +92,8 @@ def main():
                 running = False
             elif event.type == SDL_KEYDOWN and event.key == SDLK_F1:
                 show_collision = not show_collision
+            elif event.type == SDL_KEYDOWN and event.key == SDLK_F3:
+                parts_hud.toggle()
             elif event.type == SDL_KEYDOWN and event.key == SDLK_F2:
                 map_index = (map_index + 1) % len(MAPS)
                 tile_map = load_map(world, player, MAPS[map_index][1], tile_map)
@@ -109,6 +112,7 @@ def main():
             tile_map.draw_debug()
             player.draw_hitbox()
         ammo_hud.draw()
+        parts_hud.draw()
         crosshair.draw()
         update_canvas()
         delay(0.01)

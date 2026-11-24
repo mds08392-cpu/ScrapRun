@@ -16,8 +16,9 @@ MAPS = [
     ('default', 'resources/images/maps/default_map.json'),
     ('farm_big', 'resources/images/maps/farm_big.json'),
     ('factory', 'resources/images/maps/factory.json'),
+    ('harbor', 'resources/images/maps/harbor.json'),
 ]
-START_MAP = 3  # 시작 맵 (MAPS 인덱스)
+START_MAP = 4  # 시작 맵 (MAPS 인덱스)
 
 
 def load_map(world, player, path, old_map=None):

@@ -73,8 +73,8 @@ def main():
 
     crosshair = Crosshair(player)   # UI라서 World(y축 정렬)에 넣지 않고 맨 마지막에 직접 그린다
     ammo_hud = AmmoHud(player)      # 왼쪽 아래 탄약 표시 (UI)
-
     laser = LaserSight(player)      # 레이저 도트 파츠를 달았을 때만 보임 (y축 정렬 없이 월드 위에)
+
     show_collision = False  # F1: 벽 칸 / 덩어리 / 실내 영역 / 피벗 / 파밍 지점 / 충돌 박스 디버그 표시
 
     running = True
@@ -104,8 +104,8 @@ def main():
 
         clear_canvas()
         world.draw()
-        if show_collision:
         laser.draw()
+        if show_collision:
             tile_map.draw_debug()
             player.draw_hitbox()
         ammo_hud.draw()

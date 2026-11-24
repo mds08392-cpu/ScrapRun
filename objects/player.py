@@ -442,6 +442,23 @@ class Player:
         elif was_moving and not now_moving:
             self.state_machine.handle_event(('STOP_MOVE', None))
 
+    def is_reloading(self):
+        """재장전 중이면 True."""
+        return self.action == ACTION_RELOAD
+
+    def muzzle_point(self):
+        """마우스(월드 좌표) 방향으로 MUZZLE_DIST만큼 나간 총구 위치와 단위 방향 (sx, sy, ux, uy).
+        마우스가 캐릭터 위에 있으면 마지막 조준 각도를 쓴다. (레이저 표시용)"""
+        dx = self.mouse_x + camera.x - self.x
+        dy = self.mouse_y + camera.y - self.y
+        d = math.hypot(dx, dy)
+        if d < 1.0:
+            ang = math.radians(self.aim_angle)
+            ux, uy = math.cos(ang), math.sin(ang)
+        else:
+            ux, uy = dx / d, dy / d
+        return self.x + ux * MUZZLE_DIST, self.y + uy * MUZZLE_DIST, ux, uy
+
     def can_act(self):
         """Dash/Death 중이면 False (조준/사격/재장전 불가)."""
         return self.state_machine.cur_state not in (Dash, Death)

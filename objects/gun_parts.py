@@ -53,3 +53,25 @@ def parts_for_slot(slot):
 def get_part(part_id):
     """id로 파츠를 찾는다."""
     return PARTS[part_id]
+
+
+# ---------------------------------------------------------------
+# 손잡이 (grip): 반동 / 탄 퍼짐 / 반동 회복 / 연사 속도
+# ---------------------------------------------------------------
+register(
+    GunPart('grip_vertical', '수직 손잡이', 'grip', RARITY_COMMON,
+            mul={'recoil': 0.8},
+            desc='연사 반동 20% 감소'),
+    GunPart('grip_angled', '앵글 손잡이', 'grip', RARITY_COMMON,
+            mul={'spread': 0.85, 'recover': 1.2},
+            desc='기본 탄 퍼짐 15% 감소, 반동 회복 20% 빠름'),
+    GunPart('grip_half', '하프 손잡이', 'grip', RARITY_RARE,
+            mul={'recoil': 0.9, 'recover': 1.35},
+            desc='반동 10% 감소, 반동 회복 35% 빠름'),
+    GunPart('grip_light', '경량 손잡이', 'grip', RARITY_RARE,
+            mul={'fire_interval': 0.88, 'recoil': 1.1},
+            desc='연사 속도 약 14% 증가, 반동 10% 증가'),
+    GunPart('grip_thumb', '엄지 손잡이', 'grip', RARITY_EPIC,
+            mul={'aim_spread': 0.8, 'recoil': 0.9, 'aim_move': 1.1},
+            desc='조준 탄 퍼짐 20% 감소, 반동 10% 감소, 조준 이동 10% 빠름'),
+)

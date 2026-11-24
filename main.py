@@ -97,7 +97,7 @@ def main():
 
         world.update(dt)
         tile_map.update_occlusion(player.x, player.sort_y)  # 건물 안이면 플레이어를 건물 위에 그림
-        camera.follow(player.x, player.y)
+        camera.follow(*player.camera_target())   # 배율 조준 중이면 마우스 쪽으로 더 본다
         crosshair.update(dt)
 
         clear_canvas()

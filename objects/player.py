@@ -86,6 +86,7 @@ RECOVER_RATE = 70.0     # bloom이 줄어드는 속도 (px/초)
 # 연사 간격은 총 능력치 gun.stat('fire_interval') (objects/gun.py BASE_STATS, 파츠로 변함)
 MIN_AIM_DIST = 40       # 마우스가 캐릭터에 이보다 가까우면 이 거리로 밀어서 계산
 MUZZLE_DIST = 20        # 캐릭터 중심에서 이만큼 앞에서 총알이 나온다
+LOOK_K = 8.0            # 배율 조준 시 카메라 시선(look_x/y)이 목표를 따라가는 속도 (클수록 빠름)
 
 
 def pick_target_point(px, py, mx, my, aim_angle, radius, rand=random.random):
@@ -135,6 +136,7 @@ class Player:
         self.aim_angle = -90.0      # 캐릭터 -> 마우스 각도 (도, 0 = 오른쪽, 반시계)
         self.aim_dir = 'down'       # 8방향 (조준 걷기 시트용)
         self.aim_dir6 = 'down'      # 6방향 (Idle_Gun 시트용)
+        self.look_x, self.look_y = 0.0, 0.0   # 배율 조준 시 카메라가 캐릭터에서 밀려난 거리 (px)
 
         # 행동 (이동 상태와 별개): NONE / AIM / SHOOT / RELOAD
         self.action = ACTION_NONE
@@ -573,6 +575,24 @@ class Player:
             rate = RECOVER_RATE * self.gun.stat('recover')
             self.recoil_acc = max(0.0, self.recoil_acc - rate * self.dt)
 
+    def update_look(self):
+        """배율(zoom) 파츠를 달고 조준 중이면 카메라 시선을 마우스 쪽으로 최대 zoom px까지 민다.
+        마우스가 화면 가장자리에 있을 때 최대이고, 조준을 풀면 캐릭터로 돌아온다 (부드럽게 따라감).
+        마우스는 화면 좌표라 카메라가 움직여도 목표가 흔들리지 않는다."""
+        zoom = self.gun.stat('zoom') if self.aiming else 0.0
+        tx = ty = 0.0
+        if zoom > 0:
+            nx = max(-1.0, min(1.0, (self.mouse_x - WINDOW_W / 2) / (WINDOW_W / 2)))
+            ny = max(-1.0, min(1.0, (self.mouse_y - WINDOW_H / 2) / (WINDOW_H / 2)))
+            tx, ty = nx * zoom, ny * zoom
+        k = 1.0 - math.exp(-LOOK_K * self.dt)
+        self.look_x += (tx - self.look_x) * k
+        self.look_y += (ty - self.look_y) * k
+
+    def camera_target(self):
+        """카메라가 화면 중앙에 둘 월드 좌표 (캐릭터 + 배율 조준 시선)."""
+        return self.x + self.look_x, self.y + self.look_y
+
     def current_sheet(self):
         """(이동 상태, action) 조합으로 이미지/행 테이블에서 시트와 방향 행을 고른다."""
         pass
@@ -606,6 +626,7 @@ class Player:
 
         if self.aiming or self.action == ACTION_SHOOT:
             self.update_aim_dir()  # 카메라가 움직이면 마우스가 가만히 있어도 각도가 바뀜
+        self.update_look()
 
     def draw(self):
         """상태 머신에 그리기를 위임한다."""

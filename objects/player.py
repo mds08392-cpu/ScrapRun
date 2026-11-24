@@ -53,7 +53,7 @@ SHOOT_FPS = 16.0        # 서서 사격할 때 애니메이션 초당 프레임 
 SHOOT_MIN_TIME = 0.25   # 좌클릭을 짧게 눌러도 사격 애니메이션을 최소한 이 시간(초)만큼 보여줌
 
 # 재장전 (R키 또는 탄창이 비면 자동). Idle/Walk에서만 가능, Run/Dash에 들어가면 취소
-RELOAD_TIME = 1.2       # 재장전 시간(초). 재장전 애니메이션 8프레임이 이 시간 동안 한 번 재생된다
+# 재장전 시간은 총 능력치 gun.stat('reload_time') (탄창 파츠로 변함). 재장전 애니메이션 8프레임이 이 시간 동안 한 번 재생된다
 RELOAD_KEYS = (SDLK_r,)
 START_RESERVE_AMMO = 90 # 예비 탄약 시작값 (인벤토리 구현 전 임시값, 추후 인벤의 총알 수로 교체)
 
@@ -150,10 +150,11 @@ class Player:
 
         # 전투 데이터
         self.hp = self.max_hp = 100
-        self.ammo = self.max_ammo = 30
+        self.ammo = self.max_ammo        # 탄창 용량은 총 능력치 (max_ammo 프로퍼티)
         self.reserve_ammo = START_RESERVE_AMMO   # 예비 탄약 (추후 인벤토리 총알로 교체)
         self.shoot_cooldown = 0.0   # 다음 발사까지 남은 시간
         self.reload_timer = 0.0     # 재장전 남은 시간
+        self.reload_duration = self.gun.stat('reload_time')   # 이번 재장전 전체 시간 (시작할 때 정함)
         self.recoil_acc = 0.0       # 연사로 누적된 탄착 반지름 증가량 (bloom, px)
         self.since_shot = RECOVER_DELAY   # 마지막 발사 후 지난 시간
 
@@ -195,6 +196,32 @@ class Player:
     def set_world(self, world):
         """총알을 생성해 넣을 World를 지정한다."""
         self.world = world
+
+    @property
+    def max_ammo(self):
+        """탄창 용량 = 총 능력치 mag_size (탄창 파츠로 변함)."""
+        return self.gun.stat('mag_size')
+
+    def equip_part(self, part):
+        """총에 파츠를 단다. 원래 있던 파츠(없으면 None)를 반환한다."""
+        old = self.gun.equip(part)
+        self.on_parts_changed(part.slot)
+        return old
+
+    def unequip_part(self, slot):
+        """총에서 slot의 파츠를 뗀다. 떼어낸 파츠(없으면 None)를 반환한다."""
+        old = self.gun.unequip(slot)
+        self.on_parts_changed(slot)
+        return old
+
+    def on_parts_changed(self, slot):
+        """탄창을 바꾸면 재장전을 취소하고, 탄창 용량을 넘는 탄은 예비 탄약으로 돌려보낸다."""
+        if slot != 'magazine':
+            return
+        self.cancel_reload()
+        if self.ammo > self.max_ammo:
+            self.reserve_ammo += self.ammo - self.max_ammo
+            self.ammo = self.max_ammo
 
     @property
     def sort_y(self):
@@ -285,7 +312,7 @@ class Player:
 
     def reload_frame(self):
         """재장전 진행도(0~1)에 맞는 재장전 애니메이션 프레임 번호."""
-        progress = 1.0 - self.reload_timer / RELOAD_TIME
+        progress = 1.0 - self.reload_timer / self.reload_duration
         return min(int(progress * FRAME_COUNT), FRAME_COUNT - 1)
 
     def draw_walk_frame(self, frame):
@@ -474,7 +501,8 @@ class Player:
         self.stop_shoot()
         self.stop_aim()          # 조준하던 방향을 바라보는 방향으로 이어받음 (aim_held는 유지)
         self.action = ACTION_RELOAD
-        self.reload_timer = RELOAD_TIME
+        self.reload_duration = self.gun.stat('reload_time')
+        self.reload_timer = self.reload_duration
 
     def cancel_reload(self):
         """Run/Dash 진입 시 재장전 취소 (탄약 변화 없음)."""

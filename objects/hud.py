@@ -2,7 +2,7 @@ from pico2d import load_image, draw_rectangle
 import pico2d.pico2d as pico2d_core
 from sdl2 import SDL_SetRenderDrawBlendMode, SDL_BLENDMODE_BLEND, SDL_BLENDMODE_NONE
 
-from objects.player import ACTION_RELOAD, RELOAD_TIME
+from objects.player import ACTION_RELOAD
 
 # 왼쪽 아래 탄약 HUD:  [탄약 아이콘] 현재탄창 / 예비탄약
 # 모든 크기는 픽셀아트 원본 단위이고 화면에는 UI_SCALE배로 그린다.
@@ -95,7 +95,7 @@ class AmmoHud:
 
         # 재장전 진행 바 (숫자 아래)
         if p.action == ACTION_RELOAD:
-            progress = max(0.0, min(1.0, 1.0 - p.reload_timer / RELOAD_TIME))
+            progress = max(0.0, min(1.0, 1.0 - p.reload_timer / p.reload_duration))
             bar_l, bar_b = text_l, icon_b
             bar_r = text_l + text_w
             self.rect(bar_l, bar_b, bar_r, bar_b + 2, BAR_BG_COLOR)

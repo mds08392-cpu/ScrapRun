@@ -8,6 +8,7 @@ from core.state_machine import StateMachine
 from core.world import World
 from objects.bullet import spawn_shot
 from objects.gun import Gun
+from objects.gun_parts import parts_for_slot
 from objects.player_states import *
 
 WINDOW_W, WINDOW_H = 960, 720
@@ -56,6 +57,9 @@ SHOOT_MIN_TIME = 0.25   # 좌클릭을 짧게 눌러도 사격 애니메이션�
 # 재장전 시간은 총 능력치 gun.stat('reload_time') (탄창 파츠로 변함). 재장전 애니메이션 8프레임이 이 시간 동안 한 번 재생된다
 RELOAD_KEYS = (SDLK_r,)
 START_RESERVE_AMMO = 90 # 예비 탄약 시작값 (인벤토리 구현 전 임시값, 추후 인벤의 총알 수로 교체)
+
+# 파츠 테스트 키 (인벤토리 구현 전 임시): 누를 때마다 슬롯의 파츠를 없음 -> 1번 -> 2번 ... -> 없음 순으로 바꾼다
+PART_CYCLE_KEYS = {SDLK_F5: 'grip', SDLK_F6: 'sight', SDLK_F7: 'muzzle', SDLK_F8: 'magazine'}
 
 # 이동 입력 (dir_x, dir_y) -> 8방향 이름 (걸으며 재장전 시트용)
 MOVE_DIR8 = {
@@ -215,6 +219,17 @@ class Player:
         old = self.gun.unequip(slot)
         self.on_parts_changed(slot)
         return old
+
+    def cycle_part(self, slot):
+        """(테스트용) slot의 파츠를 등록 순서대로 다음 것으로 바꾼다. 마지막 다음은 '없음'."""
+        options = [None] + parts_for_slot(slot)
+        cur = self.gun.parts[slot]
+        nxt = options[(options.index(cur) + 1) % len(options)]
+        if nxt is None:
+            self.unequip_part(slot)
+        else:
+            self.equip_part(nxt)
+        return nxt
 
     def on_parts_changed(self, slot):
         """탄창을 바꾸면 재장전을 취소하고, 탄창 용량을 넘는 탄은 예비 탄약으로 돌려보낸다."""
@@ -389,6 +404,11 @@ class Player:
         """마우스/WASD/Shift/Space/R 입력을 처리하고 이동·달리기·대시 시 상태 머신에 이벤트를 전달한다."""
         if event.type in (SDL_MOUSEMOTION, SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP):
             self.handle_mouse_event(event)
+            return
+
+        # F5~F8: 파츠 바꾸기 (테스트용)
+        if event.type == SDL_KEYDOWN and event.key in PART_CYCLE_KEYS:
+            self.cycle_part(PART_CYCLE_KEYS[event.key])
             return
 
         # R: 재장전

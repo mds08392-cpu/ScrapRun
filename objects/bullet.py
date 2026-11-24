@@ -4,8 +4,9 @@ from pico2d import load_image
 
 from core.camera import camera
 
-BULLET_SPEED = 900.0    # px/초
-BULLET_RANGE = 1200.0   # 이 거리를 날아가면 사라짐
+BULLET_SPEED = 900.0    # px/초 (기본값. 실제 값은 총 능력치 bullet_speed)
+BULLET_RANGE = 1200.0   # 이 거리를 날아가면 사라짐 (기본값. 실제 값은 총 능력치 bullet_range)
+BULLET_DAMAGE = 20.0    # 기본 데미지 (실제 값은 총 능력치 damage, 적 피격 판정에서 사용 예정)
 BULLET_HEIGHT = 26      # 총알이 지면에서 떠 있는 높이 (플레이어 중심 ~ 발바닥 거리와 같게)
 HIT_STEP = 4.0          # 벽 판정을 이 거리(px)마다 나눠서 해 착탄 위치를 정확히 잡는다
 
@@ -28,11 +29,15 @@ def fx_image(name):
     return _images[name]
 
 
-def spawn_shot(world, tile_map, layer, x, y, tx, ty):
-    """총구(x, y)에서 (tx, ty) 방향으로 총알과 총구 화염을 함께 생성해 world에 넣는다."""
-    bullet = Bullet(world, tile_map, layer, x, y, tx, ty)
-    world.add_object(MuzzleFlash(world, x, y, bullet.rad), layer)
+def spawn_shot(world, tile_map, layer, x, y, tx, ty, damage=BULLET_DAMAGE, speed=BULLET_SPEED,
+               max_range=BULLET_RANGE, flash=True):
+    """총구(x, y)에서 (tx, ty) 방향으로 총알과 총구 화염을 함께 생성해 world에 넣는다.
+    damage/speed/max_range는 총 능력치, flash=False면 총구 화염을 만들지 않는다 (소음기/소염기)."""
+    bullet = Bullet(world, tile_map, layer, x, y, tx, ty, damage, speed, max_range)
+    if flash:
+        world.add_object(MuzzleFlash(world, x, y, bullet.rad), layer)
     world.add_object(bullet, layer)
+    return bullet
 
 
 class Bullet:
@@ -40,8 +45,10 @@ class Bullet:
     목표점은 목적지가 아니라 방향이라 지나쳐서 계속 날아간다.
     벽 판정과 y축 정렬은 총알 바로 밑 지면 위치(y - BULLET_HEIGHT)로 하고, 벽에 닿으면 착탄 이펙트를 남긴다."""
 
-    def __init__(self, world, tile_map, layer, x, y, tx, ty):
+    def __init__(self, world, tile_map, layer, x, y, tx, ty, damage=BULLET_DAMAGE, speed=BULLET_SPEED,
+                 max_range=BULLET_RANGE):
         self.world, self.tile_map, self.layer = world, tile_map, layer
+        self.damage, self.speed, self.max_range = damage, speed, max_range
         self.x, self.y = x, y
         d = math.hypot(tx - x, ty - y) or 1.0
         self.vx, self.vy = (tx - x) / d, (ty - y) / d
@@ -63,7 +70,7 @@ class Bullet:
 
     def update(self, dt):
         self.frame = (self.frame + dt / BULLET_FRAME_TIME) % BULLET_FRAMES
-        remaining = BULLET_SPEED * dt
+        remaining = self.speed * dt
         while remaining > 0:   # 빠른 총알이 벽을 뚫거나 벽 깊숙이 박히지 않도록 잘게 나눠 이동
             step = min(HIT_STEP, remaining)
             nx, ny = self.x + self.vx * step, self.y + self.vy * step
@@ -74,7 +81,7 @@ class Bullet:
             self.x, self.y = nx, ny
             self.traveled += step
             remaining -= step
-        if self.traveled >= BULLET_RANGE:
+        if self.traveled >= self.max_range:
             self.world.remove_object(self)
 
     def draw(self):

@@ -557,7 +557,10 @@ class Player:
             d = math.hypot(tx - self.x, ty - self.y) or 1.0
             sx = self.x + (tx - self.x) / d * MUZZLE_DIST
             sy = self.y + (ty - self.y) / d * MUZZLE_DIST
-            spawn_shot(self.world, self.tile_map, World.LAYER_BULLET, sx, sy, tx, ty)   # 총알 + 총구 화염
+            g = self.gun
+            spawn_shot(self.world, self.tile_map, World.LAYER_BULLET, sx, sy, tx, ty,   # 총알 + 총구 화염
+                       damage=g.stat('damage'), speed=g.stat('bullet_speed'), max_range=g.stat('bullet_range'),
+                       flash=not g.has_flag('hide_flash'))
         self.recoil_acc = min(self.recoil_acc + prof['recoil'] * self.gun.stat('recoil'), RECOIL_MAX)
         self.shoot_cooldown = self.gun.stat('fire_interval')
         self.since_shot = 0.0

@@ -48,6 +48,28 @@ class Gun:
         self.parts = {slot: None for slot in SLOTS}
         self._cache = None
 
+    def equip(self, part):
+        """파츠를 자기 슬롯에 단다. 그 슬롯에 있던 파츠(없으면 None)를 반환한다."""
+        old = self.parts[part.slot]
+        self.parts[part.slot] = part
+        self._cache = None
+        return old
+
+    def unequip(self, slot):
+        """슬롯의 파츠를 뗀다. 떼어낸 파츠(없으면 None)를 반환한다."""
+        old = self.parts[slot]
+        self.parts[slot] = None
+        self._cache = None
+        return old
+
+    def equipped(self):
+        """달려 있는 파츠 목록 (슬롯 순서)."""
+        return [self.parts[s] for s in SLOTS if self.parts[s] is not None]
+
+    def has_flag(self, flag):
+        """달려 있는 파츠 중 하나라도 flag를 가지면 True ('hide_flash', 'silenced', 'laser')."""
+        return any(flag in p.flags for p in self.equipped())
+
     def stat(self, key):
         """파츠가 반영된 최종 능력치 하나."""
         return self.stats()[key]
@@ -61,6 +83,13 @@ class Gun:
     def compute(self):
         """기본값 -> add -> mul -> 하한 고정 순서로 최종 능력치를 계산한다."""
         result = dict(self.base)
+        parts = self.equipped()
+        for part in parts:
+            for key, value in part.add.items():
+                result[key] += value
+        for part in parts:
+            for key, value in part.mul.items():
+                result[key] *= value
         for key, value in result.items():
             if key in STAT_MIN:
                 value = max(STAT_MIN[key], value)

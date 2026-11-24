@@ -1,0 +1,55 @@
+# 총기 파츠 정의 (순수 데이터, pico2d 없음)
+# 파츠마다 슬롯 하나(grip / sight / muzzle / magazine)에 들어가고, add/mul로 능력치를 바꾼다.
+#   add:   {능력치: 값}  기본값에 더한다            예) 'mag_size': 10  -> 30발이 40발
+#   mul:   {능력치: 값}  add 뒤에 곱한다            예) 'recoil': 0.8   -> 반동 20% 감소
+#   flags: 숫자가 아닌 특수 효과 ('hide_flash' 총구 화염 숨김, 'silenced' 소음, 'laser' 레이저 표시)
+# 능력치 이름은 objects/gun.py의 BASE_STATS 참고.
+
+from objects.gun import SLOTS
+
+# 희귀도 (HUD에서 테두리/글자 색, 추후 파밍 드롭 확률에 사용)
+RARITY_COMMON, RARITY_RARE, RARITY_EPIC = 'common', 'rare', 'epic'
+RARITY_COLOR = {
+    RARITY_COMMON: (200, 200, 200),
+    RARITY_RARE:   (90, 160, 255),
+    RARITY_EPIC:   (190, 110, 255),
+}
+
+
+class GunPart:
+    """총기 파츠 하나. 능력치 적용은 Gun.compute()가 한다."""
+
+    def __init__(self, part_id, name, slot, rarity=RARITY_COMMON, add=None, mul=None, flags=(), desc=''):
+        assert slot in SLOTS, slot
+        self.id = part_id
+        self.name = name
+        self.slot = slot
+        self.rarity = rarity
+        self.add = dict(add or {})
+        self.mul = dict(mul or {})
+        self.flags = frozenset(flags)
+        self.desc = desc
+
+    def __repr__(self):
+        return f'GunPart({self.id})'
+
+
+# id -> GunPart. 슬롯별 파츠는 아래 구역에서 등록한다
+PARTS = {}
+
+
+def register(*parts):
+    """파츠를 PARTS에 등록한다 (id 중복 불가)."""
+    for part in parts:
+        assert part.id not in PARTS, part.id
+        PARTS[part.id] = part
+
+
+def parts_for_slot(slot):
+    """해당 슬롯에 들어가는 파츠 목록 (등록 순서)."""
+    return [p for p in PARTS.values() if p.slot == slot]
+
+
+def get_part(part_id):
+    """id로 파츠를 찾는다."""
+    return PARTS[part_id]

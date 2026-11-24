@@ -122,3 +122,28 @@ register(
             mul={'recoil': 0.75, 'damage': 1.1, 'bullet_speed': 1.15},
             desc='반동 25% 감소, 데미지 10% 증가, 탄속 15% 증가'),
 )
+
+
+# ---------------------------------------------------------------
+# 탄창 (magazine): 용량 / 재장전 시간 / 탄종(데미지)
+# ---------------------------------------------------------------
+register(
+    GunPart('mag_extended', '대용량 탄창', 'magazine', RARITY_COMMON,
+            add={'mag_size': 10},
+            desc='탄창 +10발'),
+    GunPart('mag_quickdraw', '퀵드로우 탄창', 'magazine', RARITY_COMMON,
+            mul={'reload_time': 0.7},
+            desc='재장전 30% 빠름'),
+    GunPart('mag_ext_quick', '대용량 퀵드로우 탄창', 'magazine', RARITY_RARE,
+            add={'mag_size': 10},
+            mul={'reload_time': 0.8},
+            desc='탄창 +10발, 재장전 20% 빠름'),
+    GunPart('mag_drum', '드럼 탄창', 'magazine', RARITY_EPIC,
+            add={'mag_size': 30},
+            mul={'reload_time': 1.5, 'aim_move': 0.9},
+            desc='탄창 +30발, 재장전 50% 느림, 조준 이동 10% 느림'),
+    GunPart('mag_ap', '철갑탄 탄창', 'magazine', RARITY_EPIC,
+            add={'mag_size': -5},
+            mul={'damage': 1.3, 'bullet_speed': 1.1},
+            desc='데미지 30% 증가, 탄속 10% 증가, 탄창 -5발'),
+)

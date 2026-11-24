@@ -7,6 +7,7 @@ from core.camera import camera
 from core.state_machine import StateMachine
 from core.world import World
 from objects.bullet import spawn_shot
+from objects.gun import Gun
 from objects.player_states import *
 
 WINDOW_W, WINDOW_H = 960, 720
@@ -82,7 +83,7 @@ RECOIL_MAX = 34         # bloom(recoil_acc) 상한
 SPREAD_MAX = 68         # 탄착 반지름 상한
 RECOVER_DELAY = 0.12    # 마지막 발사 후 이 시간(초)이 지나야 bloom이 줄어들기 시작
 RECOVER_RATE = 70.0     # bloom이 줄어드는 속도 (px/초)
-FIRE_INTERVAL = 0.11    # 연사 간격(초)
+# 연사 간격은 총 능력치 gun.stat('fire_interval') (objects/gun.py BASE_STATS, 파츠로 변함)
 MIN_AIM_DIST = 40       # 마우스가 캐릭터에 이보다 가까우면 이 거리로 밀어서 계산
 MUZZLE_DIST = 20        # 캐릭터 중심에서 이만큼 앞에서 총알이 나온다
 
@@ -143,6 +144,9 @@ class Player:
         self.shoot_timer = 0.0      # 최소 사격 표시 시간 남은 값
         self.shoot_frame = 0.0      # 서서 사격할 때 프레임
         self.shot_queued = False    # 클릭 후 아직 한 발도 안 나갔으면 True (짧은 클릭도 한 발은 나가게)
+
+        # 총 (부착 파츠에 따라 반동/퍼짐/연사/데미지/탄창 등이 바뀐다. objects/gun.py)
+        self.gun = Gun()
 
         # 전투 데이터
         self.hp = self.max_hp = 100
@@ -500,8 +504,11 @@ class Player:
         return 'idle_aim' if self.aiming else 'idle'   # Idle (Dash/Death는 사격 불가라 여기 안 옴)
 
     def spread_radius(self):
-        """지금 쏘면 총알이 향할 수 있는 원의 반지름(px) = 자세별 기본값 + 누적 bloom."""
-        base = FIRE_PROFILE[self.accuracy_state()]['spread']
+        """지금 쏘면 총알이 향할 수 있는 원의 반지름(px) = 자세별 기본값 x 총 퍼짐 배율 + 누적 bloom.
+        조준 중이면 aim_spread, 아니면 hip_spread 배율을 추가로 곱한다 (배율/손잡이 파츠)."""
+        state = self.accuracy_state()
+        base = FIRE_PROFILE[state]['spread'] * self.gun.stat('spread')
+        base *= self.gun.stat('aim_spread' if state.endswith('_aim') else 'hip_spread')
         return min(base + self.recoil_acc, SPREAD_MAX)
 
     def pick_target(self, radius):
@@ -523,16 +530,17 @@ class Player:
             sx = self.x + (tx - self.x) / d * MUZZLE_DIST
             sy = self.y + (ty - self.y) / d * MUZZLE_DIST
             spawn_shot(self.world, self.tile_map, World.LAYER_BULLET, sx, sy, tx, ty)   # 총알 + 총구 화염
-        self.recoil_acc = min(self.recoil_acc + prof['recoil'], RECOIL_MAX)
-        self.shoot_cooldown = FIRE_INTERVAL
+        self.recoil_acc = min(self.recoil_acc + prof['recoil'] * self.gun.stat('recoil'), RECOIL_MAX)
+        self.shoot_cooldown = self.gun.stat('fire_interval')
         self.since_shot = 0.0
         self.shot_queued = False
         self.ammo -= 1
 
     def recover_recoil(self):
-        """마지막 발사 후 RECOVER_DELAY가 지나면 누적 bloom을 RECOVER_RATE로 줄인다."""
+        """마지막 발사 후 RECOVER_DELAY가 지나면 누적 bloom을 RECOVER_RATE x 총 회복 배율로 줄인다."""
         if self.since_shot >= RECOVER_DELAY:
-            self.recoil_acc = max(0.0, self.recoil_acc - RECOVER_RATE * self.dt)
+            rate = RECOVER_RATE * self.gun.stat('recover')
+            self.recoil_acc = max(0.0, self.recoil_acc - rate * self.dt)
 
     def current_sheet(self):
         """(이동 상태, action) 조합으로 이미지/행 테이블에서 시트와 방향 행을 고른다."""

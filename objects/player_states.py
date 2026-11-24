@@ -150,7 +150,8 @@ class Walk:
     @staticmethod
     def do(p):
         """조준 속도 배율을 적용해 이동하고 걷기 프레임을 진행한다."""
-        move_player(p, WALK_SPEED * (AIM_SPEED_RATIO if p.aiming else 1.0))
+        # 조준 중이면 AIM_SPEED_RATIO x 총 능력치 aim_move (배율/탄창/손잡이 파츠로 변함)
+        move_player(p, WALK_SPEED * (AIM_SPEED_RATIO * p.gun.stat('aim_move') if p.aiming else 1.0))
         p.frame = (p.frame + WALK_FPS * p.dt) % FRAME_COUNT
 
     @staticmethod

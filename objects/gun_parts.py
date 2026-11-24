@@ -75,3 +75,29 @@ register(
             mul={'aim_spread': 0.8, 'recoil': 0.9, 'aim_move': 1.1},
             desc='조준 탄 퍼짐 20% 감소, 반동 10% 감소, 조준 이동 10% 빠름'),
 )
+
+
+# ---------------------------------------------------------------
+# 배율 (sight): 조준 정확도 / 조준 시 시야(zoom) / 레이저
+# zoom = 조준 중 카메라가 마우스 쪽으로 더 밀려나는 최대 거리(px). 배율이 높을수록 멀리 보지만 조준 이동이 느려진다
+# ---------------------------------------------------------------
+register(
+    GunPart('sight_reddot', '레드 도트', 'sight', RARITY_COMMON,
+            mul={'aim_spread': 0.85},
+            desc='조준 탄 퍼짐 15% 감소'),
+    GunPart('sight_holo', '홀로그램', 'sight', RARITY_COMMON,
+            mul={'aim_spread': 0.8, 'recover': 1.1},
+            desc='조준 탄 퍼짐 20% 감소, 반동 회복 10% 빠름'),
+    GunPart('sight_laser', '레이저 도트', 'sight', RARITY_RARE,
+            mul={'hip_spread': 0.75},
+            flags=('laser',),
+            desc='비조준 탄 퍼짐 25% 감소, 레이저 표시'),
+    GunPart('sight_2x', '2배율', 'sight', RARITY_RARE,
+            add={'zoom': 140},
+            mul={'aim_spread': 0.75, 'aim_move': 0.9},
+            desc='조준 시야 +140, 조준 탄 퍼짐 25% 감소, 조준 이동 10% 느림'),
+    GunPart('sight_4x', '4배율', 'sight', RARITY_EPIC,
+            add={'zoom': 280},
+            mul={'aim_spread': 0.6, 'aim_move': 0.75, 'hip_spread': 1.15},
+            desc='조준 시야 +280, 조준 탄 퍼짐 40% 감소, 조준 이동 25% 느림, 비조준 퍼짐 15% 증가'),
+)

@@ -101,3 +101,24 @@ register(
             mul={'aim_spread': 0.6, 'aim_move': 0.75, 'hip_spread': 1.15},
             desc='조준 시야 +280, 조준 탄 퍼짐 40% 감소, 조준 이동 25% 느림, 비조준 퍼짐 15% 증가'),
 )
+
+
+# ---------------------------------------------------------------
+# 총구 (muzzle): 소음기 / 소염기 / 보정기 / 머즐 브레이크 중 하나만 장착
+# ---------------------------------------------------------------
+register(
+    GunPart('muzzle_suppressor', '소음기', 'muzzle', RARITY_RARE,
+            mul={'recoil': 0.9, 'bullet_range': 1.15},
+            flags=('hide_flash', 'silenced'),
+            desc='총구 화염 없음, 소음(적 감지 범위 감소 예정), 반동 10% 감소, 사거리 15% 증가'),
+    GunPart('muzzle_flash_hider', '소염기', 'muzzle', RARITY_COMMON,
+            mul={'recoil': 0.85, 'spread': 0.95},
+            flags=('hide_flash',),
+            desc='총구 화염 없음, 반동 15% 감소, 기본 탄 퍼짐 5% 감소'),
+    GunPart('muzzle_compensator', '보정기', 'muzzle', RARITY_COMMON,
+            mul={'recoil': 0.7, 'recover': 1.15},
+            desc='반동 30% 감소, 반동 회복 15% 빠름'),
+    GunPart('muzzle_brake', '머즐 브레이크', 'muzzle', RARITY_EPIC,
+            mul={'recoil': 0.75, 'damage': 1.1, 'bullet_speed': 1.15},
+            desc='반동 25% 감소, 데미지 10% 증가, 탄속 15% 증가'),
+)
